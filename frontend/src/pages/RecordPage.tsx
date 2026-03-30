@@ -104,7 +104,7 @@ export default function RecordPage() {
         setUploading(false);
       }
     },
-    [file, context]
+    [file, context, style]
   );
 
   const resetFlow = useCallback(() => {
