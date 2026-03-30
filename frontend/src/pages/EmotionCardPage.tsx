@@ -28,6 +28,7 @@ export default function EmotionCardPage() {
   const [task, setTask] = useState<TaskStatusResponse | null>(null);
   const [loadError, setLoadError] = useState("");
   const [badId, setBadId] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const taskIdNum = taskIdParam ? Number(taskIdParam) : NaN;
@@ -131,7 +132,6 @@ export default function EmotionCardPage() {
   const outputUrl = task.output_url;
   const hasStyledOutput = !!(outputUrl && inputUrl && outputUrl !== inputUrl);
   const tags = task.tags ?? [];
-  const [showOriginal, setShowOriginal] = useState(false);
 
   return (
     <div className="emotion-card-page">
