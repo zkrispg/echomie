@@ -78,7 +78,28 @@ class PasswordForgotCodeResponse(BaseModel):
 
 
 # =====================
-# Emotion types (replaces CARTOON_STYLES)
+# Cartoon Styles (for image/video stylization)
+# =====================
+
+CARTOON_STYLES = {
+    "none": {"label": "不处理", "emoji": "🖼️", "desc": "仅情绪分析，不加卡通效果"},
+    "warm_cartoon": {"label": "温暖卡通", "emoji": "🧸", "desc": "柔和线条，暖色调，治愈感"},
+    "soft_anime": {"label": "柔光动漫", "emoji": "🌸", "desc": "日系柔光，梦幻粉彩"},
+    "watercolor": {"label": "水彩手绘", "emoji": "🎨", "desc": "水彩晕染，艺术质感"},
+    "dreamy": {"label": "梦境童话", "emoji": "🦋", "desc": "童话色彩，如梦似幻"},
+    "ghibli": {"label": "吉卜力风", "emoji": "🌿", "desc": "宫崎骏风格，自然治愈"},
+    "chibi": {"label": "Q版萌化", "emoji": "🐱", "desc": "大头萌系，可爱减压"},
+    "pixel_art": {"label": "像素回忆", "emoji": "👾", "desc": "复古像素，怀旧温暖"},
+    "sketch": {"label": "素描速写", "emoji": "✏️", "desc": "铅笔质感，简约温柔"},
+}
+
+CartoonStyle = Literal[
+    "none", "warm_cartoon", "soft_anime", "watercolor", "dreamy",
+    "ghibli", "chibi", "pixel_art", "sketch",
+]
+
+# =====================
+# Emotion types
 # =====================
 
 EMOTION_TYPES = {
@@ -103,10 +124,22 @@ TaskStatus = Literal["queued", "processing", "completed", "failed"]
 TaskSort = Literal["id_desc", "created_desc", "progress_desc"]
 
 
+class StyleInfo(BaseModel):
+    key: str
+    label: str
+    emoji: str
+    desc: str
+
+
+class StyleListResponse(BaseModel):
+    styles: List[StyleInfo]
+
+
 class TaskStatusResponse(BaseModel):
     task_id: int
     status: TaskStatus
     progress: int
+    style: Optional[str] = None
     error_msg: Optional[str] = None
     # Emotion card fields
     user_context: Optional[str] = None
@@ -132,6 +165,7 @@ class TaskItem(BaseModel):
     user_id: int
     status: TaskStatus
     progress: int
+    style: Optional[str] = None
     error_msg: Optional[str] = None
     # Emotion card fields
     user_context: Optional[str] = None

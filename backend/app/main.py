@@ -186,7 +186,7 @@ def _task_to_item(t: models.Task, request: Request) -> schemas.TaskItem:
 
     return schemas.TaskItem(
         task_id=t.id, user_id=t.user_id, status=t.status, progress=t.progress,
-        error_msg=t.error_msg,
+        style=t.style, error_msg=t.error_msg,
         user_context=t.user_context,
         scene_description=t.scene_description,
         emotion=t.emotion,
@@ -245,6 +245,15 @@ def api_test():
 @app.get("/api/emotions")
 def list_emotions():
     return {"emotions": schemas.EMOTION_TYPES}
+
+
+@app.get("/api/styles", response_model=schemas.StyleListResponse)
+def list_styles():
+    items = [
+        schemas.StyleInfo(key=k, label=v["label"], emoji=v["emoji"], desc=v["desc"])
+        for k, v in schemas.CARTOON_STYLES.items()
+    ]
+    return schemas.StyleListResponse(styles=items)
 
 
 # ==================== Auth ====================
@@ -407,6 +416,7 @@ def password_change(
 def upload_file(
     file: UploadFile = File(...),
     context: str = Form(default=""),
+    style: str = Form(default="none"),
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -416,18 +426,20 @@ def upload_file(
         raise HTTPException(status_code=400, detail="不支持的文件类型")
     if file.size and file.size > MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=413, detail=f"文件过大，最大 {MAX_UPLOAD_SIZE_MB}MB")
+    if style not in schemas.CARTOON_STYLES:
+        style = "none"
 
     ext = os.path.splitext(file.filename or "")[1].lower()
     is_image = ext in [".jpg", ".jpeg", ".png", ".webp"]
     subdir = f"images/raw/{current_user.id}" if is_image else f"videos/raw/{current_user.id}"
     input_rel_path = storage_service.save_upload_file(file, subdir=subdir)
 
-    params = {"context": context}
+    params = {"context": context, "style": style}
 
     task = models.Task(
         user_id=current_user.id, input_path=input_rel_path,
         status=models.TaskStatus.queued.value, progress=0,
-        user_context=context or None,
+        style=style, user_context=context or None,
         params_json=json.dumps(params, ensure_ascii=False),
     )
     db.add(task)
@@ -440,7 +452,11 @@ def upload_file(
     except Exception as e:
         logger.error("Enqueue failed for task %d: %s", task.id, e)
 
-    return {"code": 0, "data": {"task_id": task.id}}
+    style_info = schemas.CARTOON_STYLES.get(style, {})
+    return {"code": 0, "data": {
+        "task_id": task.id, "style": style,
+        "style_label": style_info.get("label", style),
+    }}
 
 
 # ==================== Task APIs ====================
@@ -458,7 +474,7 @@ def get_status(task_id: int, request: Request, current_user: models.User = Depen
 
     return schemas.TaskStatusResponse(
         task_id=task.id, status=task.status, progress=task.progress,
-        error_msg=task.error_msg,
+        style=task.style, error_msg=task.error_msg,
         user_context=task.user_context,
         scene_description=task.scene_description,
         emotion=task.emotion,

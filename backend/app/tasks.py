@@ -16,6 +16,7 @@ from .ai_service import (
     generate_emotion_card,
     generate_voice,
 )
+from .effects import apply_image_effect, apply_video_effect
 
 logger = get_logger("app.tasks")
 
@@ -95,9 +96,10 @@ def _process_emotion(
     user_context: str,
     media_type: str,
     task_id: int,
+    style: str,
     db: Session,
 ) -> Dict[str, Any]:
-    """Run the full AI pipeline: key-frames → VLM → LLM → TTS. Returns result dict."""
+    """Run: key-frames → VLM → LLM → TTS → cartoon effect. Returns result dict."""
 
     src_abs = str(storage.abs_path(input_path))
 
@@ -108,26 +110,26 @@ def _process_emotion(
     else:
         analysis_image = src_abs
 
-    _set_task_state(db, task_id, models.TaskStatus.processing.value, progress=25)
-    _callback_internal({"task_id": task_id, "status": "processing", "progress": 25})
+    _set_task_state(db, task_id, models.TaskStatus.processing.value, progress=20)
+    _callback_internal({"task_id": task_id, "status": "processing", "progress": 20})
 
     # Step 2: VLM scene analysis
     analysis = analyze_scene(analysis_image, user_context)
 
-    _set_task_state(db, task_id, models.TaskStatus.processing.value, progress=45,
+    _set_task_state(db, task_id, models.TaskStatus.processing.value, progress=35,
                     scene_description=analysis.get("scene", ""),
                     emotion=analysis.get("emotion", "calm"))
-    _callback_internal({"task_id": task_id, "status": "processing", "progress": 45})
+    _callback_internal({"task_id": task_id, "status": "processing", "progress": 35})
 
     # Step 3: LLM emotion card generation
     card = generate_emotion_card(analysis, user_context)
 
-    _set_task_state(db, task_id, models.TaskStatus.processing.value, progress=65,
+    _set_task_state(db, task_id, models.TaskStatus.processing.value, progress=50,
                     generated_title=card.get("title"),
                     generated_text=card.get("healing_text"),
                     emotion_emoji=card.get("emotion_emoji"),
                     tags_json=json.dumps(card.get("tags", []), ensure_ascii=False))
-    _callback_internal({"task_id": task_id, "status": "processing", "progress": 65})
+    _callback_internal({"task_id": task_id, "status": "processing", "progress": 50})
 
     # Step 4: TTS voice generation
     voice_rel = ""
@@ -140,9 +142,38 @@ def _process_emotion(
         if result_path:
             voice_rel = voice_file.relative_to(storage.base_dir).as_posix()
 
-    _set_task_state(db, task_id, models.TaskStatus.processing.value, progress=85,
+    _set_task_state(db, task_id, models.TaskStatus.processing.value, progress=65,
                     voice_path=voice_rel if voice_rel else None)
-    _callback_internal({"task_id": task_id, "status": "processing", "progress": 85})
+    _callback_internal({"task_id": task_id, "status": "processing", "progress": 65})
+
+    # Step 5: Cartoon style effect (if selected)
+    output_rel = ""
+    if style and style != "none":
+        try:
+            is_image = media_type == "image"
+            subdir = f"images/output/{user_id}" if is_image else f"videos/output/{user_id}"
+            ext = Path(input_path).suffix
+            out_dir = storage.base_dir / subdir
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out_file = out_dir / f"{uuid4().hex}{ext}"
+
+            def _progress_cb(pct: int):
+                scaled = 65 + int(pct * 0.30)
+                _set_task_state(db, task_id, models.TaskStatus.processing.value, progress=scaled)
+                _callback_internal({"task_id": task_id, "status": "processing", "progress": scaled})
+
+            if is_image:
+                apply_image_effect(src_abs, str(out_file), style)
+            else:
+                apply_video_effect(src_abs, str(out_file), style, progress_cb=_progress_cb)
+
+            output_rel = out_file.relative_to(storage.base_dir).as_posix()
+            logger.info("Style effect '%s' applied: %s", style, output_rel)
+        except Exception as e:
+            logger.error("Style effect failed (non-fatal): %s", e)
+
+    _set_task_state(db, task_id, models.TaskStatus.processing.value, progress=95)
+    _callback_internal({"task_id": task_id, "status": "processing", "progress": 95})
 
     return {
         "scene_description": analysis.get("scene", ""),
@@ -152,6 +183,7 @@ def _process_emotion(
         "generated_text": healing_text,
         "tags_json": json.dumps(card.get("tags", []), ensure_ascii=False),
         "voice_path": voice_rel,
+        "output_path": output_rel if output_rel else None,
     }
 
 
@@ -164,6 +196,7 @@ def process_payload(payload: Dict[str, Any]):
     input_path = payload["input_path"]
     params = payload.get("params") or {}
     user_context = params.get("context", "")
+    style = params.get("style", "none")
 
     db: Session = SessionLocal()
     storage = StorageService()
@@ -179,14 +212,15 @@ def process_payload(payload: Dict[str, Any]):
         _set_task_state(db, task_id=task_id, status=models.TaskStatus.processing.value, progress=10)
         _callback_internal({"task_id": task_id, "status": "processing", "progress": 10})
 
-        result = _process_emotion(storage, input_path, user_id, user_context, media_type, task_id, db)
+        result = _process_emotion(storage, input_path, user_id, user_context, media_type, task_id, style, db)
 
+        final_output = result.pop("output_path", None) or input_path
         _set_task_state(
             db,
             task_id=task_id,
             status=models.TaskStatus.completed.value,
             progress=100,
-            output_path=input_path,
+            output_path=final_output,
             error_msg=None,
             **result,
         )

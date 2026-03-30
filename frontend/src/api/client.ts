@@ -1,7 +1,7 @@
 import type {
   TokenResponse, UserMe, TaskItem, TaskStatusResponse,
   TaskListResponse, MoodItem, MoodListResponse,
-  WeeklySummaryListResponse,
+  WeeklySummaryListResponse, StyleListResponse,
 } from "./types";
 
 const TOKEN_KEY = "echomie_token";
@@ -51,11 +51,16 @@ export const apiResetByCode = (d: { email: string; code: string; new_password: s
 export const apiChangePassword = (d: { old_password: string; new_password: string }) =>
   request<{ ok: boolean }>("/api/password/change", { method: "POST", body: JSON.stringify(d) });
 
-// Upload (emotion record)
-export const apiUpload = (file: File, context: string = "") => {
+// Styles
+export const apiGetStyles = () =>
+  request<StyleListResponse>("/api/styles");
+
+// Upload (emotion record + optional cartoon style)
+export const apiUpload = (file: File, context: string = "", style: string = "none") => {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("context", context);
+  fd.append("style", style);
   return request<{ code: number; data: { task_id: number } }>("/api/upload", { method: "POST", body: fd });
 };
 

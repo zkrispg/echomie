@@ -11,11 +11,19 @@ export interface UserMe {
   created_at: string;
 }
 
+export interface StyleInfo {
+  key: string;
+  label: string;
+  emoji: string;
+  desc: string;
+}
+
 export interface TaskItem {
   task_id: number;
   user_id: number;
   status: "queued" | "processing" | "completed" | "failed";
   progress: number;
+  style?: string;
   error_msg?: string;
   user_context?: string;
   scene_description?: string;
@@ -32,6 +40,10 @@ export interface TaskItem {
 }
 
 export interface TaskStatusResponse extends Omit<TaskItem, "user_id"> {}
+
+export interface StyleListResponse {
+  styles: StyleInfo[];
+}
 
 export interface TaskListResponse {
   items: TaskItem[];

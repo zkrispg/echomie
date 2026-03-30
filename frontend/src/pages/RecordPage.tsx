@@ -1,6 +1,7 @@
-import { useState, useRef, useCallback, type FormEvent, type DragEvent, type ChangeEvent } from "react";
+import { useState, useRef, useCallback, useEffect, type FormEvent, type DragEvent, type ChangeEvent } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { apiUpload, ApiError } from "../api/client";
+import { apiUpload, apiGetStyles, ApiError } from "../api/client";
+import type { StyleInfo } from "../api/types";
 
 const ACCEPT_ATTR =
   ".jpg,.jpeg,.png,.webp,.mp4,.mov,.avi,.mkv,image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/x-msvideo,video/x-matroska";
@@ -19,11 +20,17 @@ export default function RecordPage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [dragover, setDragover] = useState(false);
   const [context, setContext] = useState("");
+  const [style, setStyle] = useState("none");
+  const [styles, setStyles] = useState<StyleInfo[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [taskId, setTaskId] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    apiGetStyles().then((r) => setStyles(r.styles)).catch(() => {});
+  }, []);
 
   const clearFile = useCallback(() => {
     setFile(null);
@@ -89,7 +96,7 @@ export default function RecordPage() {
       setError("");
       setUploading(true);
       try {
-        const res = await apiUpload(file, context.trim());
+        const res = await apiUpload(file, context.trim(), style);
         setTaskId(res.data.task_id);
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "上传失败，请重试");
@@ -104,6 +111,7 @@ export default function RecordPage() {
     setTaskId(null);
     clearFile();
     setContext("");
+    setStyle("none");
     setError("");
   }, [clearFile]);
 
@@ -195,6 +203,27 @@ export default function RecordPage() {
           rows={4}
           disabled={uploading}
         />
+
+        {styles.length > 0 && (
+          <div className="style-section">
+            <h3>选择卡通风格（选填）</h3>
+            <div className="style-grid">
+              {styles.map((s) => (
+                <button
+                  type="button"
+                  key={s.key}
+                  className={`style-card${style === s.key ? " active" : ""}`}
+                  onClick={() => setStyle(s.key)}
+                  disabled={uploading}
+                >
+                  <span className="style-emoji">{s.emoji}</span>
+                  <span className="style-label">{s.label}</span>
+                  <span className="style-desc">{s.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {uploading && <p className="record-loading">AI 正在感受你的画面...</p>}
 

@@ -128,20 +128,44 @@ export default function EmotionCardPage() {
 
   const { emoji, label, accent } = emotionDisplay(task);
   const inputUrl = task.input_url;
+  const outputUrl = task.output_url;
+  const hasStyledOutput = outputUrl && outputUrl !== inputUrl;
   const tags = task.tags ?? [];
 
   return (
     <div className="emotion-card-page">
       <Link to="/timeline" className="btn btn-ghost emotion-card-back">← 返回时间线</Link>
 
-      {inputUrl && (
+      {hasStyledOutput && (
+        <div className="card-section-label">卡通风格化效果</div>
+      )}
+      {hasStyledOutput && (
         <div className="card-hero">
-          {isVideoUrl(inputUrl) ? (
-            <video src={inputUrl} className="card-hero-media" controls playsInline />
+          {isVideoUrl(outputUrl) ? (
+            <video src={outputUrl} className="card-hero-media" controls playsInline />
           ) : (
-            <img src={inputUrl} alt="" className="card-hero-media" />
+            <img src={outputUrl} alt="风格化" className="card-hero-media" />
           )}
         </div>
+      )}
+
+      {inputUrl && (
+        <>
+          {hasStyledOutput && <div className="card-section-label">原始画面</div>}
+          <div className={`card-hero${hasStyledOutput ? " card-hero-secondary" : ""}`}>
+            {isVideoUrl(inputUrl) ? (
+              <video src={inputUrl} className="card-hero-media" controls playsInline />
+            ) : (
+              <img src={inputUrl} alt="原图" className="card-hero-media" />
+            )}
+          </div>
+        </>
+      )}
+
+      {hasStyledOutput && outputUrl && (
+        <a href={outputUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm" style={{ marginBottom: 16 }}>
+          下载风格化图片
+        </a>
       )}
 
       <div
