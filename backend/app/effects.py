@@ -1,6 +1,6 @@
 """
 EchoMie — cartoon / stylization effects using OpenCV.
-Balanced: clearly different from original, but aesthetically pleasing.
+Gentle & aesthetic: clearly stylized but soft and pleasing.
 """
 
 import cv2
@@ -25,22 +25,20 @@ def _write_img(path: str, img: np.ndarray):
     cv2.imwrite(path, img)
 
 
-def _flatten(img: np.ndarray, sp: int = 20, sr: int = 40) -> np.ndarray:
+def _flatten(img: np.ndarray, sp: int = 15, sr: int = 30) -> np.ndarray:
     return cv2.pyrMeanShiftFiltering(img, sp=sp, sr=sr)
 
 
-def _quantize(img: np.ndarray, k: int = 8) -> np.ndarray:
+def _quantize(img: np.ndarray, k: int = 10) -> np.ndarray:
     h, w = img.shape[:2]
-    max_dim = 300
-    scale = min(1.0, max_dim / max(h, w))
+    scale = min(1.0, 300 / max(h, w))
     small = cv2.resize(img, None, fx=scale, fy=scale) if scale < 1 else img
     data = small.reshape((-1, 3)).astype(np.float32)
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0)
     _, _, centers = cv2.kmeans(data, k, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
     centers = np.uint8(centers)
-    full_data = img.reshape((-1, 3)).astype(np.float32)
-    dists = np.linalg.norm(full_data[:, None] - centers[None, :], axis=2)
-    labels = np.argmin(dists, axis=1)
+    full = img.reshape((-1, 3)).astype(np.float32)
+    labels = np.argmin(np.linalg.norm(full[:, None] - centers[None, :], axis=2), axis=1)
     return centers[labels].reshape(img.shape)
 
 
@@ -57,109 +55,92 @@ def _edges(img: np.ndarray, blur_k: int = 7, block: int = 9,
     return cv2.cvtColor(e, cv2.COLOR_GRAY2BGR)
 
 
-def _tint(img: np.ndarray, bgr: tuple, strength: float) -> np.ndarray:
-    overlay = np.full_like(img, bgr)
-    return cv2.addWeighted(img, 1 - strength, overlay, strength, 0)
+def _tint(img: np.ndarray, bgr: tuple, s: float) -> np.ndarray:
+    return cv2.addWeighted(img, 1 - s, np.full_like(img, bgr), s, 0)
 
 
-def _saturate(img: np.ndarray, factor: float) -> np.ndarray:
+def _sat(img: np.ndarray, f: float) -> np.ndarray:
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype(np.float32)
-    hsv[:, :, 1] = np.clip(hsv[:, :, 1] * factor, 0, 255)
+    hsv[:, :, 1] = np.clip(hsv[:, :, 1] * f, 0, 255)
     return cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
 
 
-def _glow(img: np.ndarray, r: int = 31, a: float = 0.3) -> np.ndarray:
-    blurred = cv2.GaussianBlur(img, (r | 1, r | 1), 0)
-    return cv2.addWeighted(img, 1 - a, blurred, a, 0)
+def _glow(img: np.ndarray, r: int = 31, a: float = 0.25) -> np.ndarray:
+    return cv2.addWeighted(img, 1 - a, cv2.GaussianBlur(img, (r | 1, r | 1), 0), a, 0)
 
 
 # ──────────────────────────────────────────────
 
 def effect_warm_cartoon(img: np.ndarray) -> np.ndarray:
-    """Warm cartoon: smooth + limited palette + outlines + warm tint."""
-    flat = _flatten(img, sp=20, sr=45)
-    q = _quantize(flat, k=8)
-    e = _edges(img, blur_k=7, block=9, c=2, thick=2)
-    result = cv2.bitwise_and(q, e)
-    result = _tint(result, (120, 170, 255), 0.15)
-    result = _saturate(result, 1.3)
-    return cv2.convertScaleAbs(result, alpha=1.05, beta=10)
+    flat = _flatten(img, sp=15, sr=35)
+    q = _quantize(flat, k=12)
+    e = _edges(img, blur_k=7, block=9, c=2, thick=1)
+    r = cv2.bitwise_and(q, e)
+    r = _tint(r, (140, 180, 255), 0.10)
+    r = _sat(r, 1.2)
+    return cv2.convertScaleAbs(r, alpha=1.03, beta=8)
 
 
 def effect_soft_anime(img: np.ndarray) -> np.ndarray:
-    """Soft anime: smooth, pastel, glow, thin lines."""
-    flat = _flatten(img, sp=25, sr=50)
-    flat = cv2.convertScaleAbs(flat, alpha=1.0, beta=25)
-    flat = _saturate(flat, 0.7)
-    flat = _glow(flat, r=45, a=0.4)
+    flat = _flatten(img, sp=18, sr=40)
+    flat = cv2.convertScaleAbs(flat, alpha=1.0, beta=18)
+    flat = _sat(flat, 0.75)
+    flat = _glow(flat, r=41, a=0.35)
     e = _edges(img, blur_k=9, block=13, c=5, thick=1)
-    result = cv2.bitwise_and(flat, e)
-    result = _tint(result, (210, 180, 255), 0.12)
-    return result
+    r = cv2.bitwise_and(flat, e)
+    return _tint(r, (215, 190, 255), 0.08)
 
 
 def effect_watercolor(img: np.ndarray) -> np.ndarray:
-    """Watercolor: stylization + saturation + glow."""
-    s = cv2.stylization(img, sigma_s=150, sigma_r=0.6)
-    s = _saturate(s, 1.5)
-    s = _glow(s, r=35, a=0.25)
-    return s
+    s = cv2.stylization(img, sigma_s=120, sigma_r=0.55)
+    s = _sat(s, 1.35)
+    return _glow(s, r=31, a=0.2)
 
 
 def effect_dreamy(img: np.ndarray) -> np.ndarray:
-    """Dreamy: bloom + warm + vignette."""
-    bloom = cv2.GaussianBlur(img, (0, 0), sigmaX=30)
-    d = cv2.addWeighted(img, 0.4, bloom, 0.6, 15)
-    d = _saturate(d, 1.5)
-    d = _tint(d, (130, 170, 255), 0.15)
+    bloom = cv2.GaussianBlur(img, (0, 0), sigmaX=22)
+    d = cv2.addWeighted(img, 0.5, bloom, 0.5, 10)
+    d = _sat(d, 1.35)
+    d = _tint(d, (140, 175, 255), 0.10)
     h, w = d.shape[:2]
     Y, X = np.mgrid[0:h, 0:w].astype(np.float32)
-    cx, cy = w / 2, h / 2
-    dist = ((X - cx) ** 2 + (Y - cy) ** 2) / (cx ** 2 + cy ** 2)
-    vig = np.clip(1.0 - 0.5 * dist, 0.2, 1.0)
-    d = (d.astype(np.float32) * vig[:, :, None]).astype(np.uint8)
-    return d
+    dist = ((X - w / 2) ** 2 + (Y - h / 2) ** 2) / ((w / 2) ** 2 + (h / 2) ** 2)
+    vig = np.clip(1.0 - 0.4 * dist, 0.25, 1.0)
+    return (d.astype(np.float32) * vig[:, :, None]).astype(np.uint8)
 
 
 def effect_ghibli(img: np.ndarray) -> np.ndarray:
-    """Ghibli: edge-preserving + vivid greens + outlines."""
-    flat = cv2.edgePreservingFilter(img, flags=1, sigma_s=120, sigma_r=0.55)
-    flat = _saturate(flat, 1.5)
-    flat = _tint(flat, (150, 235, 150), 0.12)
-    flat = cv2.convertScaleAbs(flat, alpha=1.1, beta=10)
+    flat = cv2.edgePreservingFilter(img, flags=1, sigma_s=90, sigma_r=0.5)
+    flat = _sat(flat, 1.35)
+    flat = _tint(flat, (160, 230, 160), 0.08)
+    flat = cv2.convertScaleAbs(flat, alpha=1.08, beta=8)
     e = _edges(img, blur_k=7, block=11, c=4, thick=1)
     return cv2.bitwise_and(flat, e)
 
 
 def effect_chibi(img: np.ndarray) -> np.ndarray:
-    """Chibi: very smooth, few colors, thick outlines, vivid."""
-    flat = _flatten(img, sp=35, sr=60)
-    q = _quantize(flat, k=6)
-    e = _edges(img, blur_k=5, block=7, c=2, thick=3)
-    result = cv2.bitwise_and(q, e)
-    result = cv2.convertScaleAbs(result, alpha=1.05, beta=25)
-    result = _saturate(result, 1.6)
-    result = _tint(result, (200, 170, 255), 0.08)
-    return result
+    flat = _flatten(img, sp=25, sr=50)
+    q = _quantize(flat, k=8)
+    e = _edges(img, blur_k=5, block=7, c=2, thick=2)
+    r = cv2.bitwise_and(q, e)
+    r = cv2.convertScaleAbs(r, alpha=1.03, beta=18)
+    r = _sat(r, 1.4)
+    return _tint(r, (205, 180, 255), 0.06)
 
 
 def effect_pixel_art(img: np.ndarray) -> np.ndarray:
-    """Pixel art: chunky pixels, limited palette."""
     h, w = img.shape[:2]
-    ps = max(8, min(w, h) // 36)
+    ps = max(6, min(w, h) // 48)
     small = cv2.resize(img, (w // ps, h // ps), interpolation=cv2.INTER_LINEAR)
-    small = _quantize(small, k=10)
-    small = _saturate(small, 1.4)
+    small = _quantize(small, k=12)
+    small = _sat(small, 1.3)
     return cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
 
 
 def effect_sketch(img: np.ndarray) -> np.ndarray:
-    """Pencil sketch: pencil lines + faint color wash."""
-    gray, colour = cv2.pencilSketch(img, sigma_s=100, sigma_r=0.04, shade_factor=0.03)
+    gray, colour = cv2.pencilSketch(img, sigma_s=80, sigma_r=0.05, shade_factor=0.04)
     g3 = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-    result = cv2.addWeighted(g3, 0.6, colour, 0.4, 0)
-    result = _tint(result, (200, 210, 230), 0.05)
-    return result
+    return cv2.addWeighted(g3, 0.45, colour, 0.55, 0)
 
 
 # ──────────────────────────────────────────────
@@ -187,15 +168,13 @@ def get_effect_fn(style: str) -> Callable[[np.ndarray], np.ndarray]:
 def apply_image_effect(input_path: str, output_path: str, style: str = "warm_cartoon"):
     logger.info("Applying '%s' to image: %s", style, input_path)
     img = _read_img(input_path)
-    fn = get_effect_fn(style)
-    result = fn(img)
+    result = get_effect_fn(style)(img)
     _write_img(output_path, result)
     logger.info("Saved stylised image: %s", output_path)
 
 
 def apply_video_effect(
-    input_path: str,
-    output_path: str,
+    input_path: str, output_path: str,
     style: str = "warm_cartoon",
     progress_cb: Callable[[int], None] | None = None,
 ):
@@ -204,15 +183,11 @@ def apply_video_effect(
     cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
         raise FileNotFoundError(f"Cannot open video: {input_path}")
-
     fps = cap.get(cv2.CAP_PROP_FPS) or 24
-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    w, h = int(cap.get(3)), int(cap.get(4))
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
-
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
-
     idx = 0
     try:
         while True:
