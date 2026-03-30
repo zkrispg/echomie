@@ -226,7 +226,7 @@ def process_payload(payload: Dict[str, Any]):
         )
         _callback_internal({
             "task_id": task_id, "status": "completed",
-            "progress": 100, "output_path": input_path, "error_msg": None,
+            "progress": 100, "output_path": final_output, "error_msg": None,
         })
 
     except Exception as e:
