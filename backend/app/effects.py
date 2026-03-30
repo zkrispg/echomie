@@ -1,6 +1,6 @@
 """
 EchoMie — cartoon / stylization effects using OpenCV + Pillow.
-Strengthened effects for clearly visible cartoon transformations.
+Dramatically visible effects — every style should look obviously different from the original.
 """
 
 import cv2
@@ -30,30 +30,35 @@ def _write_img(path: str, img: np.ndarray):
 
 
 def _color_quantize(img: np.ndarray, k: int = 8) -> np.ndarray:
-    data = img.reshape((-1, 3)).astype(np.float32)
+    h, w = img.shape[:2]
+    small = cv2.resize(img, (min(w, 400), min(h, 400)))
+    data = small.reshape((-1, 3)).astype(np.float32)
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0)
-    _, labels, centers = cv2.kmeans(data, k, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+    _, labels_s, centers = cv2.kmeans(data, k, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
     centers = np.uint8(centers)
-    return centers[labels.flatten()].reshape(img.shape)
+    data_full = img.reshape((-1, 3)).astype(np.float32)
+    dists = np.linalg.norm(data_full[:, None] - centers[None, :], axis=2)
+    labels_full = np.argmin(dists, axis=1)
+    return centers[labels_full].reshape(img.shape)
 
 
 def _warm_shift(img: np.ndarray, strength: float = 0.15) -> np.ndarray:
-    overlay = np.full_like(img, (140, 180, 255))
+    overlay = np.full_like(img, (120, 170, 255))
     return cv2.addWeighted(img, 1 - strength, overlay, strength, 0)
 
 
 def _cool_shift(img: np.ndarray, strength: float = 0.10) -> np.ndarray:
-    overlay = np.full_like(img, (255, 210, 190))
+    overlay = np.full_like(img, (255, 200, 180))
     return cv2.addWeighted(img, 1 - strength, overlay, strength, 0)
 
 
 def _pink_shift(img: np.ndarray, strength: float = 0.12) -> np.ndarray:
-    overlay = np.full_like(img, (200, 180, 255))
+    overlay = np.full_like(img, (200, 160, 255))
     return cv2.addWeighted(img, 1 - strength, overlay, strength, 0)
 
 
 def _green_shift(img: np.ndarray, strength: float = 0.10) -> np.ndarray:
-    overlay = np.full_like(img, (180, 240, 180))
+    overlay = np.full_like(img, (160, 240, 160))
     return cv2.addWeighted(img, 1 - strength, overlay, strength, 0)
 
 
@@ -62,12 +67,18 @@ def _add_soft_glow(img: np.ndarray, radius: int = 25, alpha: float = 0.3) -> np.
     return cv2.addWeighted(img, 1 - alpha, blurred, alpha, 0)
 
 
-def _get_edges(img: np.ndarray, blur_k: int = 7, block_size: int = 9, c: int = 3) -> np.ndarray:
+def _get_edges(img: np.ndarray, blur_k: int = 7, block_size: int = 9,
+               c: int = 3, thickness: int = 0) -> np.ndarray:
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     gray = cv2.medianBlur(gray, blur_k)
     edges = cv2.adaptiveThreshold(
         gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, block_size, c
     )
+    if thickness > 0:
+        inv = cv2.bitwise_not(edges)
+        kernel = np.ones((thickness, thickness), np.uint8)
+        inv = cv2.dilate(inv, kernel, iterations=1)
+        edges = cv2.bitwise_not(inv)
     return cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
 
 
@@ -90,118 +101,109 @@ def _bilateral_smooth(img: np.ndarray, passes: int = 5, d: int = 9,
 
 
 # ──────────────────────────────────────────────
-# Style implementations (strengthened)
+# Style implementations — each must produce a DRAMATICALLY visible change
 # ──────────────────────────────────────────────
 
 def effect_warm_cartoon(img: np.ndarray) -> np.ndarray:
-    """Warm cartoon: heavy smoothing + bold edges + warm palette + color reduction."""
-    smooth = _bilateral_smooth(img, passes=6, sigma_color=100, sigma_space=100)
-    smooth = _color_quantize(smooth, k=8)
+    """Heavy flat cartoon: very smooth, few colors, bold black outlines, warm tint."""
+    smooth = _bilateral_smooth(img, passes=10, d=9, sigma_color=150, sigma_space=150)
+    smooth = _color_quantize(smooth, k=6)
 
-    edges = _get_edges(img, blur_k=7, block_size=9, c=2)
+    edges = _get_edges(img, blur_k=7, block_size=9, c=2, thickness=3)
     cartoon = cv2.bitwise_and(smooth, edges)
 
-    cartoon = _warm_shift(cartoon, 0.20)
-    cartoon = _brighten(cartoon, 15)
-    cartoon = _saturate(cartoon, 1.3)
+    cartoon = _warm_shift(cartoon, 0.25)
+    cartoon = _brighten(cartoon, 20)
+    cartoon = _saturate(cartoon, 1.5)
     return cartoon
 
 
 def effect_soft_anime(img: np.ndarray) -> np.ndarray:
-    """Soft anime: very smooth skin, pastel glow, dreamy feel."""
-    smooth = _bilateral_smooth(img, passes=7, sigma_color=120, sigma_space=120)
+    """Anime: ultra-smooth, pastel, dreamy glow, thin edge lines, pink tint."""
+    smooth = _bilateral_smooth(img, passes=12, d=9, sigma_color=200, sigma_space=200)
+    smooth = _brighten(smooth, 40)
+    smooth = _saturate(smooth, 0.65)
+    smooth = _add_soft_glow(smooth, radius=55, alpha=0.55)
 
-    smooth = _brighten(smooth, 30)
-    smooth = _saturate(smooth, 0.75)
-
-    smooth = _add_soft_glow(smooth, radius=45, alpha=0.45)
-
-    edges = _get_edges(img, blur_k=9, block_size=13, c=4)
+    edges = _get_edges(img, blur_k=9, block_size=13, c=5, thickness=2)
     result = cv2.bitwise_and(smooth, edges)
-
-    result = _pink_shift(result, 0.15)
+    result = _pink_shift(result, 0.22)
     return result
 
 
 def effect_watercolor(img: np.ndarray) -> np.ndarray:
-    """Watercolor: strong stylization + saturation boost + soft bleeding."""
-    styled = cv2.stylization(img, sigma_s=100, sigma_r=0.55)
-    styled = _saturate(styled, 1.5)
-    styled = _add_soft_glow(styled, radius=31, alpha=0.3)
-    styled = _warm_shift(styled, 0.06)
+    """Watercolor: heavy stylization, color bleeding, paper texture feel."""
+    styled = cv2.stylization(img, sigma_s=150, sigma_r=0.65)
+    styled = _saturate(styled, 1.7)
+    styled = _add_soft_glow(styled, radius=41, alpha=0.35)
+    styled = _warm_shift(styled, 0.10)
     return styled
 
 
 def effect_dreamy(img: np.ndarray) -> np.ndarray:
-    """Dreamy: heavy bloom + high saturation + vignette."""
-    bloom = cv2.GaussianBlur(img, (0, 0), sigmaX=25)
-    dreamy = cv2.addWeighted(img, 0.45, bloom, 0.55, 15)
-    dreamy = _saturate(dreamy, 1.5)
-    dreamy = _warm_shift(dreamy, 0.15)
-    dreamy = _brighten(dreamy, 10)
+    """Dreamy: massive bloom, oversaturated, heavy vignette, ethereal glow."""
+    bloom = cv2.GaussianBlur(img, (0, 0), sigmaX=35)
+    dreamy = cv2.addWeighted(img, 0.35, bloom, 0.65, 20)
+    dreamy = _saturate(dreamy, 1.7)
+    dreamy = _warm_shift(dreamy, 0.22)
+    dreamy = _brighten(dreamy, 15)
 
     h, w = dreamy.shape[:2]
     x = np.linspace(-1, 1, w)
     y = np.linspace(-1, 1, h)
     X, Y = np.meshgrid(x, y)
-    vignette = 1 - 0.45 * (X ** 2 + Y ** 2)
-    vignette = np.clip(vignette, 0.2, 1.0).astype(np.float32)
+    vignette = 1 - 0.55 * (X ** 2 + Y ** 2)
+    vignette = np.clip(vignette, 0.15, 1.0).astype(np.float32)
     dreamy = (dreamy.astype(np.float32) * vignette[:, :, np.newaxis]).astype(np.uint8)
     return dreamy
 
 
 def effect_ghibli(img: np.ndarray) -> np.ndarray:
-    """Ghibli-inspired: strong edge-preserving + vivid greens + warm contrast."""
-    filtered = cv2.edgePreservingFilter(img, flags=1, sigma_s=100, sigma_r=0.5)
-    filtered = _saturate(filtered, 1.5)
-    filtered = _green_shift(filtered, 0.18)
+    """Ghibli: edge-preserving + vivid greens + warm sunlight + visible outlines."""
+    filtered = cv2.edgePreservingFilter(img, flags=1, sigma_s=150, sigma_r=0.6)
+    filtered = _saturate(filtered, 1.7)
+    filtered = _green_shift(filtered, 0.22)
+    filtered = cv2.convertScaleAbs(filtered, alpha=1.15, beta=15)
 
-    filtered = cv2.convertScaleAbs(filtered, alpha=1.1, beta=10)
-
-    edges = _get_edges(img, blur_k=7, block_size=11, c=4)
+    edges = _get_edges(img, blur_k=7, block_size=11, c=4, thickness=2)
     result = cv2.bitwise_and(filtered, edges)
+    result = _warm_shift(result, 0.08)
     return result
 
 
 def effect_chibi(img: np.ndarray) -> np.ndarray:
-    """Chibi/cute: extreme smoothing + very few colors + thick edges + vivid."""
-    smooth = _bilateral_smooth(img, passes=8, sigma_color=150, sigma_space=150)
-    smooth = _color_quantize(smooth, k=6)
+    """Chibi: extreme smoothing, only 4 colors, very thick black outlines, vivid pink."""
+    smooth = _bilateral_smooth(img, passes=15, d=9, sigma_color=250, sigma_space=250)
+    smooth = _color_quantize(smooth, k=4)
 
-    edges = _get_edges(img, blur_k=5, block_size=7, c=2)
-    # Make edges thicker
-    kernel = np.ones((2, 2), np.uint8)
-    edges_inv = cv2.bitwise_not(edges)
-    edges_inv = cv2.dilate(edges_inv, kernel, iterations=1)
-    edges = cv2.bitwise_not(edges_inv)
-
+    edges = _get_edges(img, blur_k=5, block_size=7, c=2, thickness=4)
     cartoon = cv2.bitwise_and(smooth, edges)
-    cartoon = _brighten(cartoon, 35)
-    cartoon = _saturate(cartoon, 1.6)
-    cartoon = _pink_shift(cartoon, 0.10)
+
+    cartoon = _brighten(cartoon, 45)
+    cartoon = _saturate(cartoon, 1.8)
+    cartoon = _pink_shift(cartoon, 0.18)
     return cartoon
 
 
 def effect_pixel_art(img: np.ndarray) -> np.ndarray:
-    """Pixel art: aggressive downscale + very few colors."""
+    """Pixel art: very chunky pixels, limited palette, retro."""
     h, w = img.shape[:2]
-    pixel_size = max(6, min(w, h) // 48)
+    pixel_size = max(8, min(w, h) // 32)
 
     small = cv2.resize(img, (w // pixel_size, h // pixel_size), interpolation=cv2.INTER_LINEAR)
-    small = _color_quantize(small, k=12)
-    small = _saturate(small, 1.4)
+    small = _color_quantize(small, k=8)
+    small = _saturate(small, 1.6)
+    small = _brighten(small, 10)
     pixelated = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
     return pixelated
 
 
 def effect_sketch(img: np.ndarray) -> np.ndarray:
-    """Pencil sketch: strong pencil lines + faint color wash."""
-    gray, colour = cv2.pencilSketch(img, sigma_s=80, sigma_r=0.05, shade_factor=0.03)
-
+    """Pencil sketch: heavy dark pencil lines, very faint washed-out color."""
+    gray, colour = cv2.pencilSketch(img, sigma_s=100, sigma_r=0.04, shade_factor=0.02)
     gray_bgr = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-    # Strong sketch lines with subtle color
-    result = cv2.addWeighted(colour, 0.3, gray_bgr, 0.7, 0)
-    result = _warm_shift(result, 0.05)
+    result = cv2.addWeighted(colour, 0.2, gray_bgr, 0.8, 0)
+    result = _warm_shift(result, 0.06)
     return result
 
 

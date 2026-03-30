@@ -1,8 +1,23 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiGetStatus, ApiError } from "../api/client";
 import { EMOTION_MAP } from "../api/types";
 import type { TaskStatusResponse } from "../api/types";
+
+function downloadFile(url: string, filename?: string) {
+  fetch(url)
+    .then(r => r.blob())
+    .then(blob => {
+      const a = document.createElement("a");
+      const blobUrl = URL.createObjectURL(blob);
+      a.href = blobUrl;
+      a.download = filename || url.split("/").pop() || "download";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(blobUrl); a.remove(); }, 200);
+    })
+    .catch(() => { window.open(url, "_blank"); });
+}
 
 function isVideoUrl(url: string): boolean {
   try {
@@ -140,6 +155,11 @@ export default function EmotionCardPage() {
     if (text) navigator.clipboard.writeText(text).catch(() => {});
   };
 
+  const handleDownload = useCallback((url: string, prefix: string) => {
+    const ext = url.split(".").pop()?.split("?")[0] || "jpg";
+    downloadFile(url, `echomie_${prefix}_${taskIdNum}.${ext}`);
+  }, [taskIdNum]);
+
   return (
     <div className="emotion-card-page">
       <Link to="/timeline" className="btn btn-ghost emotion-card-back">← 返回时间线</Link>
@@ -175,16 +195,16 @@ export default function EmotionCardPage() {
 
       <div className="card-actions">
         {hasStyledOutput && outputUrl && (
-          <a href={outputUrl} download target="_blank" rel="noopener noreferrer" className="card-action-btn primary">
+          <button type="button" className="card-action-btn primary" onClick={() => handleDownload(outputUrl, "styled")}>
             <span className="card-action-icon">⬇️</span>
-            <span>下载风格化</span>
-          </a>
+            <span>保存风格化</span>
+          </button>
         )}
         {inputUrl && (
-          <a href={inputUrl} download target="_blank" rel="noopener noreferrer" className="card-action-btn">
+          <button type="button" className="card-action-btn" onClick={() => handleDownload(inputUrl, "original")}>
             <span className="card-action-icon">{isVideo ? "🎬" : "🖼️"}</span>
-            <span>{hasStyledOutput ? "下载原图" : (isVideo ? "下载视频" : "下载图片")}</span>
-          </a>
+            <span>{hasStyledOutput ? "保存原图" : (isVideo ? "保存视频" : "保存图片")}</span>
+          </button>
         )}
         {task.generated_text && (
           <button type="button" className="card-action-btn" onClick={handleCopyText}>
