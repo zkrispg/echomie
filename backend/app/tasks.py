@@ -148,29 +148,29 @@ def _process_emotion(
 
     # Step 5: Cartoon style effect (if selected)
     output_rel = ""
+    logger.info("Task %d: style='%s', media_type='%s'", task_id, style, media_type)
     if style and style != "none":
-        try:
-            is_image = media_type == "image"
-            subdir = f"images/output/{user_id}" if is_image else f"videos/output/{user_id}"
-            ext = Path(input_path).suffix
-            out_dir = storage.base_dir / subdir
-            out_dir.mkdir(parents=True, exist_ok=True)
-            out_file = out_dir / f"{uuid4().hex}{ext}"
+        is_image = media_type == "image"
+        subdir = f"images/output/{user_id}" if is_image else f"videos/output/{user_id}"
+        ext = Path(input_path).suffix
+        out_dir = storage.base_dir / subdir
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_file = out_dir / f"{uuid4().hex}{ext}"
 
-            def _progress_cb(pct: int):
-                scaled = 65 + int(pct * 0.30)
-                _set_task_state(db, task_id, models.TaskStatus.processing.value, progress=scaled)
-                _callback_internal({"task_id": task_id, "status": "processing", "progress": scaled})
+        def _progress_cb(pct: int):
+            scaled = 65 + int(pct * 0.30)
+            _set_task_state(db, task_id, models.TaskStatus.processing.value, progress=scaled)
+            _callback_internal({"task_id": task_id, "status": "processing", "progress": scaled})
 
-            if is_image:
-                apply_image_effect(src_abs, str(out_file), style)
-            else:
-                apply_video_effect(src_abs, str(out_file), style, progress_cb=_progress_cb)
+        if is_image:
+            apply_image_effect(src_abs, str(out_file), style)
+        else:
+            apply_video_effect(src_abs, str(out_file), style, progress_cb=_progress_cb)
 
-            output_rel = out_file.relative_to(storage.base_dir).as_posix()
-            logger.info("Style effect '%s' applied: %s", style, output_rel)
-        except Exception as e:
-            logger.error("Style effect failed (non-fatal): %s", e)
+        output_rel = out_file.relative_to(storage.base_dir).as_posix()
+        logger.info("Task %d: style effect '%s' applied -> %s", task_id, style, output_rel)
+    else:
+        logger.info("Task %d: no style selected (style='%s'), skipping effect", task_id, style)
 
     _set_task_state(db, task_id, models.TaskStatus.processing.value, progress=95)
     _callback_internal({"task_id": task_id, "status": "processing", "progress": 95})
