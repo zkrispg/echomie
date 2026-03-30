@@ -16,11 +16,11 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await apiLogin(identifier, password);
+      const res = await apiLogin({ identifier, password });
       await login(res.access_token);
       navigate("/");
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : "登录失败");
+      setError(err instanceof ApiError ? err.message : "登录失败");
     } finally {
       setLoading(false);
     }

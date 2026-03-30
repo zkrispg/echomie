@@ -15,7 +15,7 @@ function isVideoUrl(url: string): boolean {
 
 function emotionDisplay(task: TaskStatusResponse) {
   const key = task.emotion?.toLowerCase() ?? "";
-  const mapped = key && EMOTION_MAP[key];
+  const mapped = key ? EMOTION_MAP[key] : undefined;
   return {
     emoji: mapped?.emoji ?? task.emotion_emoji ?? "💭",
     label: mapped?.label ?? task.emotion ?? "情绪",

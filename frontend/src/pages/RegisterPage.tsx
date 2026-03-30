@@ -20,11 +20,11 @@ export default function RegisterPage() {
     if (password.length < 6) { setError("密码至少6位"); return; }
     setLoading(true);
     try {
-      const res = await apiRegister(username, email, password);
+      const res = await apiRegister({ username, email, password });
       await login(res.access_token);
       navigate("/");
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : "注册失败");
+      setError(err instanceof ApiError ? err.message : "注册失败");
     } finally {
       setLoading(false);
     }

@@ -41,7 +41,7 @@ export default function ForgotPasswordPage() {
         startCooldown(res.cooldown_seconds);
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : "发送失败");
+      setError(err instanceof ApiError ? err.message : "发送失败");
     } finally {
       setLoading(false);
     }
@@ -58,7 +58,7 @@ export default function ForgotPasswordPage() {
         startCooldown(res.cooldown_seconds);
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : "发送失败");
+      setError(err instanceof ApiError ? err.message : "发送失败");
     } finally {
       setLoading(false);
     }
@@ -80,11 +80,11 @@ export default function ForgotPasswordPage() {
 
     setLoading(true);
     try {
-      await apiResetByCode(email, code, newPassword);
+      await apiResetByCode({ email, code, new_password: newPassword });
       setSuccess("密码重置成功！正在跳转登录...");
       setTimeout(() => navigate("/login"), 1500);
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : "重置失败");
+      setError(err instanceof ApiError ? err.message : "重置失败");
     } finally {
       setLoading(false);
     }
