@@ -51,6 +51,7 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
       SMTP_USE_TLS: "1"
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
     volumes:
       - storage_data:/data/storage
     expose:
@@ -73,6 +74,7 @@ services:
       BACKEND_BASE_URL: http://backend:8000
       STORAGE_BASE_PATH: /data/storage
       LOG_LEVEL: INFO
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
     volumes:
       - storage_data:/data/storage
 

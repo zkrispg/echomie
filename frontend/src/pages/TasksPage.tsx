@@ -11,7 +11,7 @@ const FILTERS = [
   { value: "failed", label: "❌ 失败" },
 ];
 
-function formatTime(iso: string | null) {
+function formatTime(iso?: string) {
   if (!iso) return "";
   return new Date(iso).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
@@ -23,19 +23,22 @@ function TaskCard({ task, onRefresh }: { task: TaskItem; onRefresh: () => void }
   const action = async (fn: () => Promise<unknown>) => {
     setError("");
     setLoading(true);
-    try { await fn(); onRefresh(); } catch (e) { setError(e instanceof ApiError ? e.detail : "操作失败"); }
+    try { await fn(); onRefresh(); } catch (e) { setError(e instanceof ApiError ? e.message : "操作失败"); }
     setLoading(false);
   };
+
+  const title = task.generated_title || `#${task.task_id}`;
+  const emoji = task.emotion_emoji || "💭";
 
   return (
     <div className={`task-card status-${task.status}`}>
       <div className="task-card-header">
-        <span className="task-title">{task.title || `#${task.task_id}`}</span>
+        <span className="task-title">{emoji} {title}</span>
         <span className={`badge-sm status-${task.status}`}>
           {task.status === "completed" ? "✅ 完成" : task.status === "processing" ? "⏳ 处理中" : task.status === "queued" ? "🕐 排队" : "❌ 失败"}
         </span>
       </div>
-      <div className="task-style-tag">{task.style}</div>
+      {task.emotion && <div className="task-style-tag">{task.emotion}</div>}
       {(task.status === "processing" || task.status === "queued") && (
         <div className="progress-bar"><div className="progress-fill" style={{ width: `${task.progress}%` }} /><span className="progress-pct">{task.progress}%</span></div>
       )}
@@ -44,8 +47,8 @@ function TaskCard({ task, onRefresh }: { task: TaskItem; onRefresh: () => void }
       <div className="task-card-footer">
         <span className="task-time">{formatTime(task.created_at)}</span>
         <div className="task-actions">
-          {task.status === "completed" && task.output_url && (
-            <a href={task.output_url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-primary">下载</a>
+          {task.status === "completed" && (
+            <Link to={`/card/${task.task_id}`} className="btn btn-sm btn-primary">查看</Link>
           )}
           {(task.status === "queued" || task.status === "processing") && (
             <button className="btn btn-sm btn-warning" onClick={() => action(() => apiCancelTask(task.task_id))} disabled={loading}>取消</button>
@@ -95,7 +98,7 @@ export default function TasksPage() {
           <h1>📋 我的任务</h1>
           <p className="page-subtitle">共 {total} 个任务</p>
         </div>
-        <Link to="/transform" className="btn btn-primary">✨ 新建创作</Link>
+        <Link to="/record" className="btn btn-primary">📷 记录此刻</Link>
       </div>
       <div className="filter-bar">
         {FILTERS.map((f) => (
@@ -110,7 +113,7 @@ export default function TasksPage() {
         <div className="empty-state">
           <div className="empty-emoji">📭</div>
           <h3>暂无任务</h3>
-          <Link to="/transform" className="btn btn-primary" style={{ marginTop: 12 }}>去创作</Link>
+          <Link to="/record" className="btn btn-primary" style={{ marginTop: 12 }}>去记录</Link>
         </div>
       ) : (
         <>

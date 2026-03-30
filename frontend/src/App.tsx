@@ -6,8 +6,10 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import HomePage from "./pages/HomePage";
-import TransformPage from "./pages/TransformPage";
-import GalleryPage from "./pages/GalleryPage";
+import RecordPage from "./pages/RecordPage";
+import EmotionCardPage from "./pages/EmotionCardPage";
+import TimelinePage from "./pages/TimelinePage";
+import WeeklySummaryPage from "./pages/WeeklySummaryPage";
 import TasksPage from "./pages/TasksPage";
 import ProfilePage from "./pages/ProfilePage";
 
@@ -19,12 +21,16 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            <Route index element={<HomePage />} />
-            <Route path="transform" element={<TransformPage />} />
-            <Route path="gallery" element={<GalleryPage />} />
-            <Route path="tasks" element={<TasksPage />} />
-            <Route path="profile" element={<ProfilePage />} />
+          <Route element={<ProtectedRoute />}>
+            <Route element={<Layout />}>
+              <Route index element={<HomePage />} />
+              <Route path="record" element={<RecordPage />} />
+              <Route path="card/:taskId" element={<EmotionCardPage />} />
+              <Route path="timeline" element={<TimelinePage />} />
+              <Route path="weekly" element={<WeeklySummaryPage />} />
+              <Route path="tasks" element={<TasksPage />} />
+              <Route path="profile" element={<ProfilePage />} />
+            </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

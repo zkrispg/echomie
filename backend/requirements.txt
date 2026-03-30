@@ -13,3 +13,5 @@ aiofiles
 opencv-python-headless
 numpy
 Pillow
+openai
+edge-tts

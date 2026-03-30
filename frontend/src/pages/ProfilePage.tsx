@@ -35,11 +35,11 @@ export default function ProfilePage() {
     if (newPwd.length < 6) { setPwdError("新密码至少6位"); return; }
     setPwdLoading(true);
     try {
-      await apiChangePassword(oldPwd, newPwd);
+      await apiChangePassword({ old_password: oldPwd, new_password: newPwd });
       setPwdSuccess("密码修改成功 🎉");
       setOldPwd(""); setNewPwd(""); setConfirmPwd("");
     } catch (err) {
-      setPwdError(err instanceof ApiError ? err.detail : "修改失败");
+      setPwdError(err instanceof ApiError ? err.message : "修改失败");
     }
     setPwdLoading(false);
   };

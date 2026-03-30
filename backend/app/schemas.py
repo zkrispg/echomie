@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Optional, Literal
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel
 
 
@@ -78,28 +78,25 @@ class PasswordForgotCodeResponse(BaseModel):
 
 
 # =====================
-# Cartoon Styles
+# Emotion types (replaces CARTOON_STYLES)
 # =====================
 
-CARTOON_STYLES = {
-    "warm_cartoon": {"label": "温暖卡通", "emoji": "🧸", "desc": "柔和线条，暖色调，治愈感"},
-    "soft_anime": {"label": "柔光动漫", "emoji": "🌸", "desc": "日系柔光，梦幻粉彩"},
-    "watercolor": {"label": "水彩手绘", "emoji": "🎨", "desc": "水彩晕染，艺术质感"},
-    "dreamy": {"label": "梦境童话", "emoji": "🦋", "desc": "童话色彩，如梦似幻"},
-    "ghibli": {"label": "吉卜力风", "emoji": "🌿", "desc": "宫崎骏风格，自然治愈"},
-    "chibi": {"label": "Q版萌化", "emoji": "🐱", "desc": "大头萌系，可爱减压"},
-    "pixel_art": {"label": "像素回忆", "emoji": "👾", "desc": "复古像素，怀旧温暖"},
-    "sketch": {"label": "素描速写", "emoji": "✏️", "desc": "铅笔质感，简约温柔"},
+EMOTION_TYPES = {
+    "happy": {"label": "开心", "emoji": "😊", "color": "#FFD93D"},
+    "calm": {"label": "平静", "emoji": "😌", "color": "#A8D8EA"},
+    "sad": {"label": "难过", "emoji": "😢", "color": "#B0C4DE"},
+    "lonely": {"label": "孤独", "emoji": "🥺", "color": "#DDA0DD"},
+    "tired": {"label": "疲惫", "emoji": "😴", "color": "#D3D3D3"},
+    "anxious": {"label": "焦虑", "emoji": "😰", "color": "#FFB347"},
+    "hopeful": {"label": "期待", "emoji": "✨", "color": "#98FB98"},
+    "nostalgic": {"label": "怀念", "emoji": "🌅", "color": "#F4A460"},
+    "peaceful": {"label": "安宁", "emoji": "🍃", "color": "#90EE90"},
+    "excited": {"label": "兴奋", "emoji": "🎉", "color": "#FF69B4"},
 }
 
-CartoonStyle = Literal[
-    "warm_cartoon", "soft_anime", "watercolor", "dreamy",
-    "ghibli", "chibi", "pixel_art", "sketch",
-]
-
 
 # =====================
-# Task
+# Task (emotion card)
 # =====================
 
 TaskStatus = Literal["queued", "processing", "completed", "failed"]
@@ -110,10 +107,18 @@ class TaskStatusResponse(BaseModel):
     task_id: int
     status: TaskStatus
     progress: int
-    style: str = "warm_cartoon"
-    title: Optional[str] = None
-    params: Dict[str, Any] = {}
     error_msg: Optional[str] = None
+    # Emotion card fields
+    user_context: Optional[str] = None
+    scene_description: Optional[str] = None
+    emotion: Optional[str] = None
+    emotion_emoji: Optional[str] = None
+    generated_title: Optional[str] = None
+    generated_text: Optional[str] = None
+    tags: List[str] = []
+    voice_url: Optional[str] = None
+    input_url: Optional[str] = None
+    output_url: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -127,10 +132,16 @@ class TaskItem(BaseModel):
     user_id: int
     status: TaskStatus
     progress: int
-    style: str = "warm_cartoon"
-    title: Optional[str] = None
-    params: Dict[str, Any] = {}
     error_msg: Optional[str] = None
+    # Emotion card fields
+    user_context: Optional[str] = None
+    scene_description: Optional[str] = None
+    emotion: Optional[str] = None
+    emotion_emoji: Optional[str] = None
+    generated_title: Optional[str] = None
+    generated_text: Optional[str] = None
+    tags: List[str] = []
+    voice_url: Optional[str] = None
     input_url: Optional[str] = None
     output_url: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -190,6 +201,26 @@ class MoodListResponse(BaseModel):
 
 
 # =====================
+# Weekly Summary
+# =====================
+
+class WeeklySummaryItem(BaseModel):
+    id: int
+    week_start: date
+    week_end: date
+    summary_text: Optional[str] = None
+    mood_trend: Optional[str] = None
+    tags: List[str] = []
+    encouragement: Optional[str] = None
+    created_at: datetime
+
+
+class WeeklySummaryListResponse(BaseModel):
+    items: List[WeeklySummaryItem]
+    total: int
+
+
+# =====================
 # Health / System
 # =====================
 
@@ -203,14 +234,3 @@ class HealthResponse(BaseModel):
 class UploadResponse(BaseModel):
     code: int = 0
     data: Dict[str, Any]
-
-
-class StyleInfo(BaseModel):
-    key: str
-    label: str
-    emoji: str
-    desc: str
-
-
-class StyleListResponse(BaseModel):
-    styles: List[StyleInfo]

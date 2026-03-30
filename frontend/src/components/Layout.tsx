@@ -18,13 +18,17 @@ export default function Layout() {
             <span className="nav-emoji">🏠</span>
             首页
           </NavLink>
-          <NavLink to="/transform" className="nav-item">
-            <span className="nav-emoji">🎨</span>
-            AI 变身
+          <NavLink to="/record" className="nav-item">
+            <span className="nav-emoji">📷</span>
+            记录此刻
           </NavLink>
-          <NavLink to="/gallery" className="nav-item">
-            <span className="nav-emoji">🖼️</span>
-            治愈画廊
+          <NavLink to="/timeline" className="nav-item">
+            <span className="nav-emoji">📖</span>
+            情绪时间轴
+          </NavLink>
+          <NavLink to="/weekly" className="nav-item">
+            <span className="nav-emoji">📊</span>
+            每周总结
           </NavLink>
           <NavLink to="/tasks" className="nav-item">
             <span className="nav-emoji">📋</span>

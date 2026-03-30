@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, Date, ForeignKey, Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -25,6 +25,7 @@ class User(Base):
 
     tasks = relationship("Task", back_populates="user")
     moods = relationship("MoodEntry", back_populates="user")
+    weekly_summaries = relationship("WeeklySummary", back_populates="user")
 
 
 class Task(Base):
@@ -40,10 +41,21 @@ class Task(Base):
     input_path = Column(String(1024), nullable=False)
     output_path = Column(String(1024), nullable=True)
 
-    style = Column(String(64), nullable=False, default="warm_cartoon")
+    # Legacy cartoon field, kept for backwards compat
+    style = Column(String(64), nullable=True)
     title = Column(String(256), nullable=True)
     params_json = Column(Text, nullable=False, default="{}")
     error_msg = Column(Text, nullable=True)
+
+    # --- New emotion fields ---
+    user_context = Column(Text, nullable=True)
+    scene_description = Column(Text, nullable=True)
+    emotion = Column(String(32), nullable=True)
+    emotion_emoji = Column(String(16), nullable=True)
+    generated_title = Column(String(256), nullable=True)
+    generated_text = Column(Text, nullable=True)
+    tags_json = Column(Text, nullable=True)
+    voice_path = Column(String(1024), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -52,6 +64,7 @@ class Task(Base):
 
     output_url: str | None = None
     input_url: str | None = None
+    voice_url: str | None = None
 
 
 class MoodEntry(Base):
@@ -65,3 +78,19 @@ class MoodEntry(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="moods")
+
+
+class WeeklySummary(Base):
+    __tablename__ = "weekly_summaries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    week_start = Column(Date, nullable=False)
+    week_end = Column(Date, nullable=False)
+    summary_text = Column(Text, nullable=True)
+    mood_trend = Column(String(128), nullable=True)
+    tags_json = Column(Text, nullable=True)
+    encouragement = Column(String(256), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="weekly_summaries")

@@ -2,7 +2,7 @@ import json
 import math
 import os
 import random
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from typing import Any, Dict, List, Optional
 
 from fastapi import (
@@ -12,11 +12,9 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
-from fastapi.openapi.docs import (
-    get_swagger_ui_html, get_swagger_ui_oauth2_redirect_html,
-)
+from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
-from sqlalchemy import or_, text
+from sqlalchemy import or_, text, func as sa_func
 from sqlalchemy.orm import Session
 
 from .db import Base, engine, get_db
@@ -70,7 +68,7 @@ AFFIRMATIONS = {
     "anxious": [
         "深呼吸…吸…呼…你是安全的 🍃",
         "焦虑只是暂时的访客，它会离开的 🦋",
-        "试试用创作来安抚内心吧，EchoMie 在这里 💜",
+        "试试记录当下的画面吧，EchoMie 在这里 💜",
         "把担忧交给风吧，你只需要做好当下 🌬️",
         "每一步都算数，不用着急，慢慢来 🐢",
     ],
@@ -82,7 +80,7 @@ def get_affirmation(mood: str) -> str:
 
 
 # ==================== App ====================
-app = FastAPI(title="EchoMie API", version="1.0.0", docs_url=None, redoc_url=None)
+app = FastAPI(title="EchoMie API", version="2.0.0", docs_url=None, redoc_url=None)
 
 
 def custom_openapi():
@@ -150,6 +148,16 @@ def _safe_load_params(s: str) -> Dict[str, Any]:
         return {}
 
 
+def _safe_load_tags(s: Optional[str]) -> List[str]:
+    if not s:
+        return []
+    try:
+        obj = json.loads(s)
+        return obj if isinstance(obj, list) else []
+    except Exception:
+        return []
+
+
 def _build_page_url(request: Request, page: int, page_size: int) -> str:
     from urllib.parse import urlencode
     qp = dict(request.query_params)
@@ -168,6 +176,30 @@ def _abs_url(request: Request, path: str) -> str:
     if not path.startswith("/"):
         path = "/" + path
     return base + path
+
+
+def _task_to_item(t: models.Task, request: Request) -> schemas.TaskItem:
+    """Convert a Task ORM object to a TaskItem schema with all emotion fields."""
+    input_url = _abs_url(request, storage_service.get_public_url(t.input_path)) if t.input_path else None
+    output_url = _abs_url(request, storage_service.get_public_url(t.output_path)) if t.output_path else None
+    voice_url = _abs_url(request, storage_service.get_public_url(t.voice_path)) if t.voice_path else None
+
+    return schemas.TaskItem(
+        task_id=t.id, user_id=t.user_id, status=t.status, progress=t.progress,
+        error_msg=t.error_msg,
+        user_context=t.user_context,
+        scene_description=t.scene_description,
+        emotion=t.emotion,
+        emotion_emoji=t.emotion_emoji,
+        generated_title=t.generated_title or t.title,
+        generated_text=t.generated_text,
+        tags=_safe_load_tags(t.tags_json),
+        voice_url=voice_url,
+        input_url=input_url,
+        output_url=output_url,
+        created_at=t.created_at,
+        updated_at=t.updated_at,
+    )
 
 
 # ==================== Startup ====================
@@ -210,14 +242,9 @@ def api_test():
     return {"message": "Hello from EchoMie! 🌸 让每一刻都温柔以待"}
 
 
-# ==================== Styles ====================
-@app.get("/api/styles", response_model=schemas.StyleListResponse)
-def list_styles():
-    items = [
-        schemas.StyleInfo(key=k, label=v["label"], emoji=v["emoji"], desc=v["desc"])
-        for k, v in schemas.CARTOON_STYLES.items()
-    ]
-    return schemas.StyleListResponse(styles=items)
+@app.get("/api/emotions")
+def list_emotions():
+    return {"emotions": schemas.EMOTION_TYPES}
 
 
 # ==================== Auth ====================
@@ -375,13 +402,11 @@ def password_change(
     return {"ok": True}
 
 
-# ==================== Upload / Transform ====================
+# ==================== Upload (emotion record) ====================
 @app.post("/api/upload", response_model=schemas.UploadResponse)
 def upload_file(
     file: UploadFile = File(...),
-    style: str = Form(default="warm_cartoon"),
-    title: str = Form(default=""),
-    params_json: str = Form(default="{}"),
+    context: str = Form(default=""),
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -391,25 +416,18 @@ def upload_file(
         raise HTTPException(status_code=400, detail="不支持的文件类型")
     if file.size and file.size > MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=413, detail=f"文件过大，最大 {MAX_UPLOAD_SIZE_MB}MB")
-    if style not in schemas.CARTOON_STYLES:
-        style = "warm_cartoon"
-    try:
-        params = json.loads(params_json or "{}")
-        if not isinstance(params, dict):
-            params = {}
-    except Exception:
-        params = {}
-    params["style"] = style
 
     ext = os.path.splitext(file.filename or "")[1].lower()
     is_image = ext in [".jpg", ".jpeg", ".png", ".webp"]
     subdir = f"images/raw/{current_user.id}" if is_image else f"videos/raw/{current_user.id}"
     input_rel_path = storage_service.save_upload_file(file, subdir=subdir)
 
+    params = {"context": context}
+
     task = models.Task(
         user_id=current_user.id, input_path=input_rel_path,
         status=models.TaskStatus.queued.value, progress=0,
-        style=style, title=title or None,
+        user_context=context or None,
         params_json=json.dumps(params, ensure_ascii=False),
     )
     db.add(task)
@@ -422,26 +440,35 @@ def upload_file(
     except Exception as e:
         logger.error("Enqueue failed for task %d: %s", task.id, e)
 
-    style_info = schemas.CARTOON_STYLES.get(style, {})
-    return {"code": 0, "data": {
-        "task_id": task.id, "style": style,
-        "style_label": style_info.get("label", style),
-        "title": title,
-    }}
+    return {"code": 0, "data": {"task_id": task.id}}
 
 
 # ==================== Task APIs ====================
 @app.get("/api/status", response_model=schemas.TaskStatusResponse)
-def get_status(task_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_status(task_id: int, request: Request, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     if task.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
+
+    input_url = _abs_url(request, storage_service.get_public_url(task.input_path)) if task.input_path else None
+    output_url = _abs_url(request, storage_service.get_public_url(task.output_path)) if task.output_path else None
+    voice_url = _abs_url(request, storage_service.get_public_url(task.voice_path)) if task.voice_path else None
+
     return schemas.TaskStatusResponse(
         task_id=task.id, status=task.status, progress=task.progress,
-        style=task.style or "warm_cartoon", title=task.title,
-        params=_safe_load_params(task.params_json), error_msg=task.error_msg,
+        error_msg=task.error_msg,
+        user_context=task.user_context,
+        scene_description=task.scene_description,
+        emotion=task.emotion,
+        emotion_emoji=task.emotion_emoji,
+        generated_title=task.generated_title or task.title,
+        generated_text=task.generated_text,
+        tags=_safe_load_tags(task.tags_json),
+        voice_url=voice_url,
+        input_url=input_url,
+        output_url=output_url,
         created_at=task.created_at, updated_at=task.updated_at,
     )
 
@@ -488,6 +515,12 @@ def retry_task(task_id: int, current_user: models.User = Depends(get_current_use
     task.progress = 0
     task.error_msg = None
     task.output_path = None
+    task.scene_description = None
+    task.emotion = None
+    task.generated_title = None
+    task.generated_text = None
+    task.tags_json = None
+    task.voice_path = None
     db.commit()
     params = _safe_load_params(task.params_json)
     try:
@@ -508,14 +541,11 @@ def delete_task(task_id: int, current_user: models.User = Depends(get_current_us
     if task.status == models.TaskStatus.processing.value:
         raise HTTPException(status_code=400, detail="处理中的任务请先取消")
     try:
-        if task.input_path:
-            p = storage_service.abs_path(task.input_path)
-            if p.exists():
-                p.unlink()
-        if task.output_path:
-            p = storage_service.abs_path(task.output_path)
-            if p.exists():
-                p.unlink()
+        for path_field in [task.input_path, task.output_path, task.voice_path]:
+            if path_field:
+                p = storage_service.abs_path(path_field)
+                if p.exists():
+                    p.unlink()
     except Exception as e:
         logger.warning("Cleanup failed for task %d: %s", task_id, e)
     db.delete(task)
@@ -526,7 +556,7 @@ def delete_task(task_id: int, current_user: models.User = Depends(get_current_us
 @app.get("/api/tasks", response_model=schemas.TaskListResponse)
 def list_tasks(
     request: Request, page: int = 1, page_size: int = 20,
-    status: Optional[str] = None, style: Optional[str] = None,
+    status: Optional[str] = None,
     sort: schemas.TaskSort = "id_desc",
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -538,8 +568,6 @@ def list_tasks(
     query = db.query(models.Task).filter(models.Task.user_id == current_user.id)
     if status:
         query = query.filter(models.Task.status == status)
-    if style:
-        query = query.filter(models.Task.style == style)
 
     order = {
         "id_desc": [models.Task.id.desc()],
@@ -555,21 +583,7 @@ def list_tasks(
         page = pages
     tasks = query.offset((page - 1) * page_size).limit(page_size).all()
 
-    items = []
-    for t in tasks:
-        output_url = None
-        input_url = None
-        if t.status == models.TaskStatus.completed.value and t.output_path:
-            output_url = _abs_url(request, storage_service.get_public_url(t.output_path))
-        if t.input_path:
-            input_url = _abs_url(request, storage_service.get_public_url(t.input_path))
-        items.append(schemas.TaskItem(
-            task_id=t.id, user_id=t.user_id, status=t.status, progress=t.progress,
-            style=t.style or "warm_cartoon", title=t.title,
-            params=_safe_load_params(t.params_json), error_msg=t.error_msg,
-            input_url=input_url, output_url=output_url,
-            created_at=t.created_at, updated_at=t.updated_at,
-        ))
+    items = [_task_to_item(t, request) for t in tasks]
 
     self_url = _build_page_url(request, page, page_size)
     next_url = _build_page_url(request, page + 1, page_size) if page < pages else None
@@ -580,36 +594,23 @@ def list_tasks(
     )
 
 
-# Gallery: only completed tasks
-@app.get("/api/gallery", response_model=schemas.TaskListResponse)
-def gallery(
+@app.get("/api/timeline", response_model=schemas.TaskListResponse)
+def timeline(
     request: Request, page: int = 1, page_size: int = 20,
-    style: Optional[str] = None,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Emotion timeline: completed tasks ordered by date descending."""
     query = db.query(models.Task).filter(
         models.Task.user_id == current_user.id,
         models.Task.status == models.TaskStatus.completed.value,
-    )
-    if style:
-        query = query.filter(models.Task.style == style)
-    query = query.order_by(models.Task.created_at.desc())
+    ).order_by(models.Task.created_at.desc())
 
     total = query.count()
     pages = max(1, math.ceil(total / page_size)) if total else 1
     tasks = query.offset((page - 1) * page_size).limit(page_size).all()
-    items = []
-    for t in tasks:
-        output_url = _abs_url(request, storage_service.get_public_url(t.output_path)) if t.output_path else None
-        input_url = _abs_url(request, storage_service.get_public_url(t.input_path)) if t.input_path else None
-        items.append(schemas.TaskItem(
-            task_id=t.id, user_id=t.user_id, status=t.status, progress=t.progress,
-            style=t.style or "warm_cartoon", title=t.title,
-            params=_safe_load_params(t.params_json),
-            input_url=input_url, output_url=output_url,
-            created_at=t.created_at, updated_at=t.updated_at,
-        ))
+    items = [_task_to_item(t, request) for t in tasks]
+
     self_url = _build_page_url(request, page, page_size)
     next_url = _build_page_url(request, page + 1, page_size) if page < pages else None
     prev_url = _build_page_url(request, page - 1, page_size) if page > 1 else None
@@ -617,6 +618,89 @@ def gallery(
         items=items, page=page, page_size=page_size, total=total, pages=pages,
         self_url=self_url, next_url=next_url, prev_url=prev_url,
     )
+
+
+# ==================== Weekly Summary ====================
+@app.get("/api/weekly-summary", response_model=schemas.WeeklySummaryListResponse)
+def get_weekly_summaries(
+    limit: int = 10,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    summaries = (
+        db.query(models.WeeklySummary)
+        .filter(models.WeeklySummary.user_id == current_user.id)
+        .order_by(models.WeeklySummary.week_end.desc())
+        .limit(min(limit, 50))
+        .all()
+    )
+    items = [
+        schemas.WeeklySummaryItem(
+            id=s.id, week_start=s.week_start, week_end=s.week_end,
+            summary_text=s.summary_text, mood_trend=s.mood_trend,
+            tags=_safe_load_tags(s.tags_json), encouragement=s.encouragement,
+            created_at=s.created_at,
+        ) for s in summaries
+    ]
+    total = db.query(models.WeeklySummary).filter(models.WeeklySummary.user_id == current_user.id).count()
+    return schemas.WeeklySummaryListResponse(items=items, total=total)
+
+
+@app.post("/api/weekly-summary/generate")
+def generate_weekly(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate summary for the current week (Mon-Sun)."""
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
+
+    existing = db.query(models.WeeklySummary).filter(
+        models.WeeklySummary.user_id == current_user.id,
+        models.WeeklySummary.week_start == week_start,
+    ).first()
+    if existing:
+        return {"ok": True, "summary_id": existing.id, "message": "本周总结已存在"}
+
+    tasks = (
+        db.query(models.Task)
+        .filter(
+            models.Task.user_id == current_user.id,
+            models.Task.status == models.TaskStatus.completed.value,
+            sa_func.date(models.Task.created_at) >= week_start,
+            sa_func.date(models.Task.created_at) <= week_end,
+        ).all()
+    )
+
+    if not tasks:
+        raise HTTPException(status_code=400, detail="本周还没有完成的记录，先去记录一些画面吧")
+
+    cards_data = []
+    for t in tasks:
+        cards_data.append({
+            "date": str(t.created_at.date()) if t.created_at else "",
+            "emotion": t.emotion or "",
+            "title": t.generated_title or t.title or "",
+            "tags": _safe_load_tags(t.tags_json),
+            "scene": t.scene_description or "",
+        })
+
+    from .ai_service import generate_weekly_summary
+    result = generate_weekly_summary(cards_data)
+
+    summary = models.WeeklySummary(
+        user_id=current_user.id,
+        week_start=week_start, week_end=week_end,
+        summary_text=result.get("summary_text"),
+        mood_trend=result.get("mood_trend"),
+        tags_json=json.dumps(result.get("highlight_tags", []), ensure_ascii=False),
+        encouragement=result.get("encouragement"),
+    )
+    db.add(summary)
+    db.commit()
+    db.refresh(summary)
+    return {"ok": True, "summary_id": summary.id}
 
 
 # ==================== Mood / Interaction ====================
