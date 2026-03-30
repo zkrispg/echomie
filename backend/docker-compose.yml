@@ -1,0 +1,71 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: apppass
+      POSTGRES_DB: appdb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://appuser:apppass@db:5432/appdb
+      REDIS_URL: redis://redis:6379/0
+      USE_REDIS_QUEUE: "1"
+      REDIS_QUEUE_NAME: ai_tasks
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-change-me-internal}
+      BACKEND_BASE_URL: http://backend:8000
+      STORAGE_BASE_PATH: /data/storage
+      MAX_UPLOAD_SIZE_MB: "500"
+      LOG_LEVEL: INFO
+      # SMTP config (set in .env or override here)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_USE_TLS: "1"
+    volumes:
+      - storage_data:/data/storage
+
+  worker:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - db
+      - redis
+    command: ["python", "worker.py"]
+    environment:
+      DATABASE_URL: postgresql://appuser:apppass@db:5432/appdb
+      REDIS_URL: redis://redis:6379/0
+      REDIS_QUEUE_NAME: ai_tasks
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-change-me-internal}
+      BACKEND_BASE_URL: http://backend:8000
+      STORAGE_BASE_PATH: /data/storage
+      LOG_LEVEL: INFO
+    volumes:
+      - storage_data:/data/storage
+
+volumes:
+  pgdata:
+  storage_data:

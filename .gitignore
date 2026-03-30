@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Build artifacts
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment & secrets
+.env
+*.db
+
+# Storage
+backend-storage/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Docker volumes
+pgdata/
+redisdata/
+storage_data/
