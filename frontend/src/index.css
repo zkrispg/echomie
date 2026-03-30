@@ -432,9 +432,21 @@ a:hover { text-decoration: underline; }
 }
 .card-hero-media { display: block; width: 100%; max-height: 420px; object-fit: contain; vertical-align: middle; }
 .card-hero video.card-hero-media { max-height: 360px; background: #000; }
-.card-hero-secondary { opacity: .85; }
-.card-hero-secondary .card-hero-media { max-height: 280px; }
-.card-section-label { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 8px; margin-top: 4px; }
+.card-compare { margin-bottom: 20px; }
+.card-compare .card-hero { margin-bottom: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.card-compare-bar {
+  display: flex; background: var(--bg-card); border: 1px solid var(--border-color);
+  border-top: none; border-radius: 0 0 var(--radius) var(--radius); overflow: hidden;
+}
+.compare-tab {
+  flex: 1; padding: 10px 12px; font-size: .85rem; font-weight: 700; font-family: inherit;
+  border: none; background: var(--bg-input); color: var(--text-secondary);
+  cursor: pointer; transition: all var(--transition); text-align: center;
+}
+.compare-tab:first-child { border-right: 1px solid var(--border-color); }
+.compare-tab:hover { background: var(--bg-hover); }
+.compare-tab.active { background: var(--color-primary); color: #fff; }
+.card-download-btn { margin-top: 12px; margin-bottom: 0; }
 .card-emotion-badge {
   display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;
   border-radius: 999px; border: 2px solid var(--border-color); background: var(--color-primary-light);

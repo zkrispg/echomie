@@ -1,9 +1,6 @@
 """
-EchoMie — real cartoon / stylization effects using OpenCV + Pillow.
-
-Each public function takes an input image path and output image path,
-applies the effect, and writes the result.  For videos the caller
-should use `apply_video_effect` which processes frame-by-frame.
+EchoMie — cartoon / stylization effects using OpenCV + Pillow.
+Strengthened effects for clearly visible cartoon transformations.
 """
 
 import cv2
@@ -33,7 +30,6 @@ def _write_img(path: str, img: np.ndarray):
 
 
 def _color_quantize(img: np.ndarray, k: int = 8) -> np.ndarray:
-    """Reduce to k colours via k-means for a flat cartoon look."""
     data = img.reshape((-1, 3)).astype(np.float32)
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0)
     _, labels, centers = cv2.kmeans(data, k, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
@@ -42,18 +38,22 @@ def _color_quantize(img: np.ndarray, k: int = 8) -> np.ndarray:
 
 
 def _warm_shift(img: np.ndarray, strength: float = 0.15) -> np.ndarray:
-    """Add a warm (orange-pink) tint."""
-    overlay = np.full_like(img, (180, 200, 255))  # BGR: light warm
+    overlay = np.full_like(img, (140, 180, 255))
     return cv2.addWeighted(img, 1 - strength, overlay, strength, 0)
 
 
 def _cool_shift(img: np.ndarray, strength: float = 0.10) -> np.ndarray:
-    overlay = np.full_like(img, (255, 220, 200))  # BGR: light cool
+    overlay = np.full_like(img, (255, 210, 190))
+    return cv2.addWeighted(img, 1 - strength, overlay, strength, 0)
+
+
+def _pink_shift(img: np.ndarray, strength: float = 0.12) -> np.ndarray:
+    overlay = np.full_like(img, (200, 180, 255))
     return cv2.addWeighted(img, 1 - strength, overlay, strength, 0)
 
 
 def _green_shift(img: np.ndarray, strength: float = 0.10) -> np.ndarray:
-    overlay = np.full_like(img, (200, 240, 200))  # BGR: gentle green
+    overlay = np.full_like(img, (180, 240, 180))
     return cv2.addWeighted(img, 1 - strength, overlay, strength, 0)
 
 
@@ -62,7 +62,7 @@ def _add_soft_glow(img: np.ndarray, radius: int = 25, alpha: float = 0.3) -> np.
     return cv2.addWeighted(img, 1 - alpha, blurred, alpha, 0)
 
 
-def _get_edges(img: np.ndarray, blur_k: int = 5, block_size: int = 9, c: int = 2) -> np.ndarray:
+def _get_edges(img: np.ndarray, blur_k: int = 7, block_size: int = 9, c: int = 3) -> np.ndarray:
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     gray = cv2.medianBlur(gray, blur_k)
     edges = cv2.adaptiveThreshold(
@@ -81,124 +81,128 @@ def _brighten(img: np.ndarray, beta: int = 15) -> np.ndarray:
     return cv2.convertScaleAbs(img, alpha=1.0, beta=beta)
 
 
+def _bilateral_smooth(img: np.ndarray, passes: int = 5, d: int = 9,
+                       sigma_color: int = 90, sigma_space: int = 90) -> np.ndarray:
+    result = img.copy()
+    for _ in range(passes):
+        result = cv2.bilateralFilter(result, d=d, sigmaColor=sigma_color, sigmaSpace=sigma_space)
+    return result
+
+
 # ──────────────────────────────────────────────
-# Style implementations
+# Style implementations (strengthened)
 # ──────────────────────────────────────────────
 
 def effect_warm_cartoon(img: np.ndarray) -> np.ndarray:
-    """Classic warm cartoon: smooth + edges + warm palette."""
-    # Heavy bilateral smoothing (3 passes)
-    smooth = img.copy()
-    for _ in range(3):
-        smooth = cv2.bilateralFilter(smooth, d=9, sigmaColor=75, sigmaSpace=75)
+    """Warm cartoon: heavy smoothing + bold edges + warm palette + color reduction."""
+    smooth = _bilateral_smooth(img, passes=6, sigma_color=100, sigma_space=100)
+    smooth = _color_quantize(smooth, k=8)
 
-    # Colour quantisation
-    smooth = _color_quantize(smooth, k=12)
-
-    # Edge overlay
-    edges = _get_edges(img)
+    edges = _get_edges(img, blur_k=7, block_size=9, c=2)
     cartoon = cv2.bitwise_and(smooth, edges)
 
-    # Warm tint + brightness
-    cartoon = _warm_shift(cartoon, 0.12)
-    cartoon = _brighten(cartoon, 10)
+    cartoon = _warm_shift(cartoon, 0.20)
+    cartoon = _brighten(cartoon, 15)
+    cartoon = _saturate(cartoon, 1.3)
     return cartoon
 
 
 def effect_soft_anime(img: np.ndarray) -> np.ndarray:
-    """Soft anime: heavy smoothing, pastel glow, subtle edges."""
-    smooth = img.copy()
-    for _ in range(4):
-        smooth = cv2.bilateralFilter(smooth, d=9, sigmaColor=90, sigmaSpace=90)
+    """Soft anime: very smooth skin, pastel glow, dreamy feel."""
+    smooth = _bilateral_smooth(img, passes=7, sigma_color=120, sigma_space=120)
 
-    # Lighten and desaturate slightly
-    smooth = _brighten(smooth, 20)
-    smooth = _saturate(smooth, 0.85)
+    smooth = _brighten(smooth, 30)
+    smooth = _saturate(smooth, 0.75)
 
-    # Soft glow
-    smooth = _add_soft_glow(smooth, radius=35, alpha=0.35)
+    smooth = _add_soft_glow(smooth, radius=45, alpha=0.45)
 
-    # Subtle edge overlay
-    edges = _get_edges(img, blur_k=7, block_size=11, c=3)
+    edges = _get_edges(img, blur_k=9, block_size=13, c=4)
     result = cv2.bitwise_and(smooth, edges)
 
-    # Cool pastel tint
-    result = _cool_shift(result, 0.08)
+    result = _pink_shift(result, 0.15)
     return result
 
 
 def effect_watercolor(img: np.ndarray) -> np.ndarray:
-    """OpenCV stylization for a watercolour feel."""
-    styled = cv2.stylization(img, sigma_s=60, sigma_r=0.45)
-    styled = _saturate(styled, 1.2)
-    styled = _add_soft_glow(styled, radius=21, alpha=0.2)
+    """Watercolor: strong stylization + saturation boost + soft bleeding."""
+    styled = cv2.stylization(img, sigma_s=100, sigma_r=0.55)
+    styled = _saturate(styled, 1.5)
+    styled = _add_soft_glow(styled, radius=31, alpha=0.3)
+    styled = _warm_shift(styled, 0.06)
     return styled
 
 
 def effect_dreamy(img: np.ndarray) -> np.ndarray:
-    """Dreamy/ethereal: bloom + saturation + vignette."""
-    bloom = cv2.GaussianBlur(img, (0, 0), sigmaX=15)
-    dreamy = cv2.addWeighted(img, 0.6, bloom, 0.4, 10)
-    dreamy = _saturate(dreamy, 1.3)
-    dreamy = _warm_shift(dreamy, 0.10)
+    """Dreamy: heavy bloom + high saturation + vignette."""
+    bloom = cv2.GaussianBlur(img, (0, 0), sigmaX=25)
+    dreamy = cv2.addWeighted(img, 0.45, bloom, 0.55, 15)
+    dreamy = _saturate(dreamy, 1.5)
+    dreamy = _warm_shift(dreamy, 0.15)
+    dreamy = _brighten(dreamy, 10)
 
-    # Soft vignette
     h, w = dreamy.shape[:2]
     x = np.linspace(-1, 1, w)
     y = np.linspace(-1, 1, h)
     X, Y = np.meshgrid(x, y)
-    vignette = 1 - 0.35 * (X ** 2 + Y ** 2)
-    vignette = np.clip(vignette, 0.3, 1.0).astype(np.float32)
+    vignette = 1 - 0.45 * (X ** 2 + Y ** 2)
+    vignette = np.clip(vignette, 0.2, 1.0).astype(np.float32)
     dreamy = (dreamy.astype(np.float32) * vignette[:, :, np.newaxis]).astype(np.uint8)
     return dreamy
 
 
 def effect_ghibli(img: np.ndarray) -> np.ndarray:
-    """Ghibli-inspired: edge-preserving filter + green nature tint."""
-    filtered = cv2.edgePreservingFilter(img, flags=1, sigma_s=60, sigma_r=0.4)
-    filtered = _saturate(filtered, 1.25)
-    filtered = _green_shift(filtered, 0.12)
+    """Ghibli-inspired: strong edge-preserving + vivid greens + warm contrast."""
+    filtered = cv2.edgePreservingFilter(img, flags=1, sigma_s=100, sigma_r=0.5)
+    filtered = _saturate(filtered, 1.5)
+    filtered = _green_shift(filtered, 0.18)
 
-    # Subtle warm contrast
-    filtered = cv2.convertScaleAbs(filtered, alpha=1.05, beta=5)
-    return filtered
+    filtered = cv2.convertScaleAbs(filtered, alpha=1.1, beta=10)
+
+    edges = _get_edges(img, blur_k=7, block_size=11, c=4)
+    result = cv2.bitwise_and(filtered, edges)
+    return result
 
 
 def effect_chibi(img: np.ndarray) -> np.ndarray:
-    """Chibi/cute: extreme smoothing + strong edges + bright colours."""
-    smooth = img.copy()
-    for _ in range(5):
-        smooth = cv2.bilateralFilter(smooth, d=9, sigmaColor=100, sigmaSpace=100)
+    """Chibi/cute: extreme smoothing + very few colors + thick edges + vivid."""
+    smooth = _bilateral_smooth(img, passes=8, sigma_color=150, sigma_space=150)
+    smooth = _color_quantize(smooth, k=6)
 
-    smooth = _color_quantize(smooth, k=10)
+    edges = _get_edges(img, blur_k=5, block_size=7, c=2)
+    # Make edges thicker
+    kernel = np.ones((2, 2), np.uint8)
+    edges_inv = cv2.bitwise_not(edges)
+    edges_inv = cv2.dilate(edges_inv, kernel, iterations=1)
+    edges = cv2.bitwise_not(edges_inv)
 
-    # Strong edges
-    edges = _get_edges(img, blur_k=5, block_size=9, c=2)
     cartoon = cv2.bitwise_and(smooth, edges)
-
-    cartoon = _brighten(cartoon, 25)
-    cartoon = _saturate(cartoon, 1.4)
-    cartoon = _warm_shift(cartoon, 0.08)
+    cartoon = _brighten(cartoon, 35)
+    cartoon = _saturate(cartoon, 1.6)
+    cartoon = _pink_shift(cartoon, 0.10)
     return cartoon
 
 
 def effect_pixel_art(img: np.ndarray) -> np.ndarray:
-    """Pixel art: quantise then downscale/upscale."""
+    """Pixel art: aggressive downscale + very few colors."""
     h, w = img.shape[:2]
-    pixel_size = max(4, min(w, h) // 80)
+    pixel_size = max(6, min(w, h) // 48)
 
     small = cv2.resize(img, (w // pixel_size, h // pixel_size), interpolation=cv2.INTER_LINEAR)
-    small = _color_quantize(small, k=16)
+    small = _color_quantize(small, k=12)
+    small = _saturate(small, 1.4)
     pixelated = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
     return pixelated
 
 
 def effect_sketch(img: np.ndarray) -> np.ndarray:
-    """Pencil sketch effect."""
-    gray, colour = cv2.pencilSketch(img, sigma_s=60, sigma_r=0.07, shade_factor=0.05)
-    # Blend sketch with faint colour
-    colour_faint = cv2.addWeighted(colour, 0.4, cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR), 0.6, 0)
-    return colour_faint
+    """Pencil sketch: strong pencil lines + faint color wash."""
+    gray, colour = cv2.pencilSketch(img, sigma_s=80, sigma_r=0.05, shade_factor=0.03)
+
+    gray_bgr = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+    # Strong sketch lines with subtle color
+    result = cv2.addWeighted(colour, 0.3, gray_bgr, 0.7, 0)
+    result = _warm_shift(result, 0.05)
+    return result
 
 
 # ──────────────────────────────────────────────
@@ -230,7 +234,6 @@ def get_effect_fn(style: str) -> Callable[[np.ndarray], np.ndarray]:
 # ──────────────────────────────────────────────
 
 def apply_image_effect(input_path: str, output_path: str, style: str = "warm_cartoon"):
-    """Read image → apply style → write result."""
     logger.info("Applying '%s' to image: %s", style, input_path)
     img = _read_img(input_path)
     fn = get_effect_fn(style)
@@ -245,7 +248,6 @@ def apply_video_effect(
     style: str = "warm_cartoon",
     progress_cb: Callable[[int], None] | None = None,
 ):
-    """Process video frame-by-frame. progress_cb receives 0-100."""
     logger.info("Applying '%s' to video: %s", style, input_path)
     fn = get_effect_fn(style)
 

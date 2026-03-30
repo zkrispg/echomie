@@ -129,44 +129,52 @@ export default function EmotionCardPage() {
   const { emoji, label, accent } = emotionDisplay(task);
   const inputUrl = task.input_url;
   const outputUrl = task.output_url;
-  const hasStyledOutput = outputUrl && outputUrl !== inputUrl;
+  const hasStyledOutput = !!(outputUrl && inputUrl && outputUrl !== inputUrl);
   const tags = task.tags ?? [];
+  const [showOriginal, setShowOriginal] = useState(false);
 
   return (
     <div className="emotion-card-page">
       <Link to="/timeline" className="btn btn-ghost emotion-card-back">← 返回时间线</Link>
 
-      {hasStyledOutput && (
-        <div className="card-section-label">卡通风格化效果</div>
-      )}
-      {hasStyledOutput && (
-        <div className="card-hero">
-          {isVideoUrl(outputUrl) ? (
-            <video src={outputUrl} className="card-hero-media" controls playsInline />
-          ) : (
-            <img src={outputUrl} alt="风格化" className="card-hero-media" />
-          )}
-        </div>
-      )}
-
-      {inputUrl && (
-        <>
-          {hasStyledOutput && <div className="card-section-label">原始画面</div>}
-          <div className={`card-hero${hasStyledOutput ? " card-hero-secondary" : ""}`}>
-            {isVideoUrl(inputUrl) ? (
-              <video src={inputUrl} className="card-hero-media" controls playsInline />
+      {hasStyledOutput ? (
+        <div className="card-compare">
+          <div className="card-hero">
+            {isVideoUrl(showOriginal ? inputUrl! : outputUrl!) ? (
+              <video src={showOriginal ? inputUrl! : outputUrl!} className="card-hero-media" controls playsInline />
             ) : (
-              <img src={inputUrl} alt="原图" className="card-hero-media" />
+              <img src={showOriginal ? inputUrl! : outputUrl!} alt={showOriginal ? "原图" : "风格化"} className="card-hero-media" />
             )}
           </div>
-        </>
-      )}
-
-      {hasStyledOutput && outputUrl && (
-        <a href={outputUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm" style={{ marginBottom: 16 }}>
-          下载风格化图片
-        </a>
-      )}
+          <div className="card-compare-bar">
+            <button
+              type="button"
+              className={`compare-tab${!showOriginal ? " active" : ""}`}
+              onClick={() => setShowOriginal(false)}
+            >
+              🎨 风格化效果
+            </button>
+            <button
+              type="button"
+              className={`compare-tab${showOriginal ? " active" : ""}`}
+              onClick={() => setShowOriginal(true)}
+            >
+              🖼️ 原始画面
+            </button>
+          </div>
+          <a href={outputUrl!} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-block card-download-btn">
+            下载风格化图片
+          </a>
+        </div>
+      ) : inputUrl ? (
+        <div className="card-hero">
+          {isVideoUrl(inputUrl) ? (
+            <video src={inputUrl} className="card-hero-media" controls playsInline />
+          ) : (
+            <img src={inputUrl} alt="原图" className="card-hero-media" />
+          )}
+        </div>
+      ) : null}
 
       <div
         className="card-emotion-badge"
