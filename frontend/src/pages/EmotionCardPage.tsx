@@ -132,49 +132,67 @@ export default function EmotionCardPage() {
   const outputUrl = task.output_url;
   const hasStyledOutput = !!(outputUrl && inputUrl && outputUrl !== inputUrl);
   const tags = task.tags ?? [];
+  const mainMedia = hasStyledOutput ? (showOriginal ? inputUrl! : outputUrl!) : (outputUrl || inputUrl);
+  const isVideo = mainMedia ? isVideoUrl(mainMedia) : false;
+
+  const handleCopyText = () => {
+    const text = [task.generated_title, task.generated_text].filter(Boolean).join("\n\n");
+    if (text) navigator.clipboard.writeText(text).catch(() => {});
+  };
 
   return (
     <div className="emotion-card-page">
       <Link to="/timeline" className="btn btn-ghost emotion-card-back">← 返回时间线</Link>
 
-      {hasStyledOutput ? (
-        <div className="card-compare">
-          <div className="card-hero">
-            {isVideoUrl(showOriginal ? inputUrl! : outputUrl!) ? (
-              <video src={showOriginal ? inputUrl! : outputUrl!} className="card-hero-media" controls playsInline />
-            ) : (
-              <img src={showOriginal ? inputUrl! : outputUrl!} alt={showOriginal ? "原图" : "风格化"} className="card-hero-media" />
-            )}
-          </div>
-          <div className="card-compare-bar">
-            <button
-              type="button"
-              className={`compare-tab${!showOriginal ? " active" : ""}`}
-              onClick={() => setShowOriginal(false)}
-            >
-              🎨 风格化效果
-            </button>
-            <button
-              type="button"
-              className={`compare-tab${showOriginal ? " active" : ""}`}
-              onClick={() => setShowOriginal(true)}
-            >
-              🖼️ 原始画面
-            </button>
-          </div>
-          <a href={outputUrl!} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-block card-download-btn">
-            下载风格化图片
-          </a>
-        </div>
-      ) : inputUrl ? (
+      {mainMedia && (
         <div className="card-hero">
-          {isVideoUrl(inputUrl) ? (
-            <video src={inputUrl} className="card-hero-media" controls playsInline />
+          {isVideo ? (
+            <video src={mainMedia} className="card-hero-media" controls playsInline />
           ) : (
-            <img src={inputUrl} alt="原图" className="card-hero-media" />
+            <img src={mainMedia} alt="媒体" className="card-hero-media" />
           )}
         </div>
-      ) : null}
+      )}
+
+      {hasStyledOutput && (
+        <div className="card-compare-bar">
+          <button
+            type="button"
+            className={`compare-tab${!showOriginal ? " active" : ""}`}
+            onClick={() => setShowOriginal(false)}
+          >
+            🎨 风格化
+          </button>
+          <button
+            type="button"
+            className={`compare-tab${showOriginal ? " active" : ""}`}
+            onClick={() => setShowOriginal(true)}
+          >
+            🖼️ 原图
+          </button>
+        </div>
+      )}
+
+      <div className="card-actions">
+        {hasStyledOutput && outputUrl && (
+          <a href={outputUrl} download target="_blank" rel="noopener noreferrer" className="card-action-btn primary">
+            <span className="card-action-icon">⬇️</span>
+            <span>下载风格化</span>
+          </a>
+        )}
+        {inputUrl && (
+          <a href={inputUrl} download target="_blank" rel="noopener noreferrer" className="card-action-btn">
+            <span className="card-action-icon">{isVideo ? "🎬" : "🖼️"}</span>
+            <span>{hasStyledOutput ? "下载原图" : (isVideo ? "下载视频" : "下载图片")}</span>
+          </a>
+        )}
+        {task.generated_text && (
+          <button type="button" className="card-action-btn" onClick={handleCopyText}>
+            <span className="card-action-icon">📋</span>
+            <span>复制文案</span>
+          </button>
+        )}
+      </div>
 
       <div
         className="card-emotion-badge"
