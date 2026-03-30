@@ -1,7 +1,6 @@
 """
 EchoMie — cartoon / stylization effects using OpenCV.
-Uses aggressive techniques (pyrMeanShift, heavy quantization, thick edges)
-to produce effects that are IMMEDIATELY obvious vs the original.
+Balanced: clearly different from original, but aesthetically pleasing.
 """
 
 import cv2
@@ -26,13 +25,11 @@ def _write_img(path: str, img: np.ndarray):
     cv2.imwrite(path, img)
 
 
-def _flatten(img: np.ndarray, sp: int = 25, sr: int = 50) -> np.ndarray:
-    """pyrMeanShiftFiltering — much more aggressive than bilateral for destroying texture."""
+def _flatten(img: np.ndarray, sp: int = 20, sr: int = 40) -> np.ndarray:
     return cv2.pyrMeanShiftFiltering(img, sp=sp, sr=sr)
 
 
-def _quantize(img: np.ndarray, k: int = 6) -> np.ndarray:
-    """Reduce to k colors via k-means."""
+def _quantize(img: np.ndarray, k: int = 8) -> np.ndarray:
     h, w = img.shape[:2]
     max_dim = 300
     scale = min(1.0, max_dim / max(h, w))
@@ -49,7 +46,6 @@ def _quantize(img: np.ndarray, k: int = 6) -> np.ndarray:
 
 def _edges(img: np.ndarray, blur_k: int = 7, block: int = 9,
            c: int = 3, thick: int = 0) -> np.ndarray:
-    """Adaptive threshold edges, optionally thickened."""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     gray = cv2.medianBlur(gray, blur_k)
     e = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
@@ -72,107 +68,100 @@ def _saturate(img: np.ndarray, factor: float) -> np.ndarray:
     return cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
 
 
-def _glow(img: np.ndarray, r: int = 31, a: float = 0.4) -> np.ndarray:
+def _glow(img: np.ndarray, r: int = 31, a: float = 0.3) -> np.ndarray:
     blurred = cv2.GaussianBlur(img, (r | 1, r | 1), 0)
     return cv2.addWeighted(img, 1 - a, blurred, a, 0)
 
 
 # ──────────────────────────────────────────────
-# Style implementations
-# ──────────────────────────────────────────────
 
 def effect_warm_cartoon(img: np.ndarray) -> np.ndarray:
-    """Flat cartoon with bold outlines and warm limited palette."""
-    flat = _flatten(img, sp=30, sr=60)
-    flat = _flatten(flat, sp=20, sr=40)
-    q = _quantize(flat, k=5)
-    e = _edges(img, blur_k=7, block=9, c=2, thick=3)
+    """Warm cartoon: smooth + limited palette + outlines + warm tint."""
+    flat = _flatten(img, sp=20, sr=45)
+    q = _quantize(flat, k=8)
+    e = _edges(img, blur_k=7, block=9, c=2, thick=2)
     result = cv2.bitwise_and(q, e)
-    result = _tint(result, (100, 160, 255), 0.25)
-    result = _saturate(result, 1.5)
-    return cv2.convertScaleAbs(result, alpha=1.05, beta=15)
+    result = _tint(result, (120, 170, 255), 0.15)
+    result = _saturate(result, 1.3)
+    return cv2.convertScaleAbs(result, alpha=1.05, beta=10)
 
 
 def effect_soft_anime(img: np.ndarray) -> np.ndarray:
-    """Dreamy anime: ultra-flat, pastel, heavy glow, thin lines."""
-    flat = _flatten(img, sp=40, sr=70)
-    flat = _flatten(flat, sp=30, sr=50)
-    flat = cv2.convertScaleAbs(flat, alpha=1.0, beta=40)
-    flat = _saturate(flat, 0.6)
-    flat = _glow(flat, r=61, a=0.55)
-    e = _edges(img, blur_k=9, block=13, c=5, thick=2)
+    """Soft anime: smooth, pastel, glow, thin lines."""
+    flat = _flatten(img, sp=25, sr=50)
+    flat = cv2.convertScaleAbs(flat, alpha=1.0, beta=25)
+    flat = _saturate(flat, 0.7)
+    flat = _glow(flat, r=45, a=0.4)
+    e = _edges(img, blur_k=9, block=13, c=5, thick=1)
     result = cv2.bitwise_and(flat, e)
-    result = _tint(result, (210, 170, 255), 0.20)
+    result = _tint(result, (210, 180, 255), 0.12)
     return result
 
 
 def effect_watercolor(img: np.ndarray) -> np.ndarray:
-    """Watercolor: OpenCV stylization at max + saturation + glow."""
-    s = cv2.stylization(img, sigma_s=200, sigma_r=0.7)
-    s = _saturate(s, 1.8)
-    s = _glow(s, r=41, a=0.3)
+    """Watercolor: stylization + saturation + glow."""
+    s = cv2.stylization(img, sigma_s=150, sigma_r=0.6)
+    s = _saturate(s, 1.5)
+    s = _glow(s, r=35, a=0.25)
     return s
 
 
 def effect_dreamy(img: np.ndarray) -> np.ndarray:
-    """Dreamy: massive bloom, oversaturated, heavy vignette."""
-    bloom = cv2.GaussianBlur(img, (0, 0), sigmaX=40)
-    d = cv2.addWeighted(img, 0.3, bloom, 0.7, 25)
-    d = _saturate(d, 1.8)
-    d = _tint(d, (120, 160, 255), 0.20)
+    """Dreamy: bloom + warm + vignette."""
+    bloom = cv2.GaussianBlur(img, (0, 0), sigmaX=30)
+    d = cv2.addWeighted(img, 0.4, bloom, 0.6, 15)
+    d = _saturate(d, 1.5)
+    d = _tint(d, (130, 170, 255), 0.15)
     h, w = d.shape[:2]
     Y, X = np.mgrid[0:h, 0:w].astype(np.float32)
     cx, cy = w / 2, h / 2
     dist = ((X - cx) ** 2 + (Y - cy) ** 2) / (cx ** 2 + cy ** 2)
-    vig = np.clip(1.0 - 0.7 * dist, 0.1, 1.0)
+    vig = np.clip(1.0 - 0.5 * dist, 0.2, 1.0)
     d = (d.astype(np.float32) * vig[:, :, None]).astype(np.uint8)
     return d
 
 
 def effect_ghibli(img: np.ndarray) -> np.ndarray:
-    """Ghibli: edge-preserving flat + vivid greens + warm sunlight + outlines."""
-    flat = cv2.edgePreservingFilter(img, flags=1, sigma_s=200, sigma_r=0.65)
-    flat = _flatten(flat, sp=20, sr=40)
-    flat = _saturate(flat, 1.8)
-    flat = _tint(flat, (140, 240, 140), 0.18)
-    flat = cv2.convertScaleAbs(flat, alpha=1.15, beta=15)
-    e = _edges(img, blur_k=7, block=11, c=4, thick=2)
+    """Ghibli: edge-preserving + vivid greens + outlines."""
+    flat = cv2.edgePreservingFilter(img, flags=1, sigma_s=120, sigma_r=0.55)
+    flat = _saturate(flat, 1.5)
+    flat = _tint(flat, (150, 235, 150), 0.12)
+    flat = cv2.convertScaleAbs(flat, alpha=1.1, beta=10)
+    e = _edges(img, blur_k=7, block=11, c=4, thick=1)
     return cv2.bitwise_and(flat, e)
 
 
 def effect_chibi(img: np.ndarray) -> np.ndarray:
-    """Chibi: extreme flat, only 4 colors, very thick outlines, pink-vivid."""
-    flat = _flatten(img, sp=50, sr=80)
-    flat = _flatten(flat, sp=40, sr=60)
-    q = _quantize(flat, k=4)
-    e = _edges(img, blur_k=5, block=7, c=2, thick=5)
+    """Chibi: very smooth, few colors, thick outlines, vivid."""
+    flat = _flatten(img, sp=35, sr=60)
+    q = _quantize(flat, k=6)
+    e = _edges(img, blur_k=5, block=7, c=2, thick=3)
     result = cv2.bitwise_and(q, e)
-    result = cv2.convertScaleAbs(result, alpha=1.1, beta=40)
-    result = _saturate(result, 2.0)
-    result = _tint(result, (200, 160, 255), 0.15)
+    result = cv2.convertScaleAbs(result, alpha=1.05, beta=25)
+    result = _saturate(result, 1.6)
+    result = _tint(result, (200, 170, 255), 0.08)
     return result
 
 
 def effect_pixel_art(img: np.ndarray) -> np.ndarray:
-    """Pixel art: very large chunky pixels, limited palette."""
+    """Pixel art: chunky pixels, limited palette."""
     h, w = img.shape[:2]
-    ps = max(10, min(w, h) // 24)
+    ps = max(8, min(w, h) // 36)
     small = cv2.resize(img, (w // ps, h // ps), interpolation=cv2.INTER_LINEAR)
-    small = _quantize(small, k=6)
-    small = _saturate(small, 1.6)
+    small = _quantize(small, k=10)
+    small = _saturate(small, 1.4)
     return cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
 
 
 def effect_sketch(img: np.ndarray) -> np.ndarray:
-    """Pencil sketch: heavy dark lines, almost no color."""
-    gray, colour = cv2.pencilSketch(img, sigma_s=120, sigma_r=0.03, shade_factor=0.01)
+    """Pencil sketch: pencil lines + faint color wash."""
+    gray, colour = cv2.pencilSketch(img, sigma_s=100, sigma_r=0.04, shade_factor=0.03)
     g3 = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
-    result = cv2.addWeighted(g3, 0.85, colour, 0.15, 0)
+    result = cv2.addWeighted(g3, 0.6, colour, 0.4, 0)
+    result = _tint(result, (200, 210, 230), 0.05)
     return result
 
 
-# ──────────────────────────────────────────────
-# Registry + public API
 # ──────────────────────────────────────────────
 
 STYLE_MAP: Dict[str, Callable[[np.ndarray], np.ndarray]] = {
