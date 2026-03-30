@@ -48,6 +48,11 @@ export default function EmotionCardPage() {
 
   const taskIdNum = taskIdParam ? Number(taskIdParam) : NaN;
 
+  const handleDownload = useCallback((url: string, prefix: string) => {
+    const ext = url.split(".").pop()?.split("?")[0] || "jpg";
+    downloadFile(url, `echomie_${prefix}_${taskIdNum}.${ext}`);
+  }, [taskIdNum]);
+
   useEffect(() => {
     if (!taskIdParam || !Number.isFinite(taskIdNum)) {
       setBadId(true);
@@ -154,11 +159,6 @@ export default function EmotionCardPage() {
     const text = [task.generated_title, task.generated_text].filter(Boolean).join("\n\n");
     if (text) navigator.clipboard.writeText(text).catch(() => {});
   };
-
-  const handleDownload = useCallback((url: string, prefix: string) => {
-    const ext = url.split(".").pop()?.split("?")[0] || "jpg";
-    downloadFile(url, `echomie_${prefix}_${taskIdNum}.${ext}`);
-  }, [taskIdNum]);
 
   return (
     <div className="emotion-card-page">
