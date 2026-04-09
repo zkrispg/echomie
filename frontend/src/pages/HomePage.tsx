@@ -94,6 +94,22 @@ export default function HomePage() {
         <p className="empty-hint-text">在"每周总结"页面生成本周的情绪回顾</p>
       </section>
 
+      <section className="home-section">
+        <h2>更多功能</h2>
+        <div className="quick-actions">
+          <Link to="/chat" className="quick-action-card">
+            <span className="quick-action-icon">💬</span>
+            <span className="quick-action-label">AI 陪伴</span>
+            <span className="quick-action-desc">和 AI 聊聊心事</span>
+          </Link>
+          <Link to="/music" className="quick-action-card">
+            <span className="quick-action-icon">🎵</span>
+            <span className="quick-action-label">音乐治愈</span>
+            <span className="quick-action-desc">让音乐抚慰心灵</span>
+          </Link>
+        </div>
+      </section>
+
       <section className="home-cta">
         <Link to="/record" className="btn btn-primary btn-lg">记录此刻</Link>
       </section>

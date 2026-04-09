@@ -12,6 +12,8 @@ import TimelinePage from "./pages/TimelinePage";
 import WeeklySummaryPage from "./pages/WeeklySummaryPage";
 import TasksPage from "./pages/TasksPage";
 import ProfilePage from "./pages/ProfilePage";
+import ChatPage from "./pages/ChatPage";
+import MusicPage from "./pages/MusicPage";
 
 export default function App() {
   return (
@@ -28,6 +30,8 @@ export default function App() {
               <Route path="card/:taskId" element={<EmotionCardPage />} />
               <Route path="timeline" element={<TimelinePage />} />
               <Route path="weekly" element={<WeeklySummaryPage />} />
+              <Route path="chat" element={<ChatPage />} />
+              <Route path="music" element={<MusicPage />} />
               <Route path="tasks" element={<TasksPage />} />
               <Route path="profile" element={<ProfilePage />} />
             </Route>

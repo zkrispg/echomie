@@ -206,6 +206,11 @@ def _task_to_item(t: models.Task, request: Request) -> schemas.TaskItem:
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
+    try:
+        from .init_music import init_music
+        init_music(str(STORAGE_BASE_DIR))
+    except Exception as e:
+        logger.warning("Music init skipped: %s", e)
     logger.info("EchoMie backend started")
 
 
@@ -800,3 +805,137 @@ def list_moods(
 @app.get("/api/affirmation")
 def get_daily_affirmation(mood: str = "okay"):
     return {"affirmation": get_affirmation(mood), "mood": mood}
+
+
+# ==================== Poster / Share ====================
+@app.get("/api/tasks/{task_id}/poster")
+def generate_task_poster(
+    task_id: int,
+    request: Request,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if task.status != models.TaskStatus.completed.value:
+        raise HTTPException(status_code=400, detail="Task not completed")
+
+    image_path = None
+    for p in [task.output_path, task.input_path]:
+        if p:
+            full = storage_service.base_dir / p
+            if full.exists():
+                image_path = str(full)
+                break
+
+    from .poster import generate_poster
+    poster_path = generate_poster(
+        title=task.generated_title or task.title or "",
+        healing_text=task.generated_text or "",
+        emotion=task.emotion or "calm",
+        emotion_emoji=task.emotion_emoji or "💭",
+        image_path=image_path,
+    )
+
+    rel = os.path.relpath(poster_path, storage_service.base_dir)
+    url = _abs_url(request, storage_service.get_public_url(rel))
+    return {"ok": True, "poster_url": url}
+
+
+# ==================== Music / Healing ====================
+def _music_url(name: str) -> str:
+    """Return actual music file URL, preferring .mp3 then .wav."""
+    music_dir = STORAGE_BASE_DIR / "music"
+    for ext in ("mp3", "wav"):
+        if (music_dir / f"{name}.{ext}").exists():
+            return f"/static/music/{name}.{ext}"
+    return f"/static/music/{name}.wav"
+
+
+HEALING_MUSIC_DEF = [
+    {"id": "calm_piano", "name": "宁静钢琴曲", "emotion": "calm"},
+    {"id": "gentle_rain", "name": "温柔雨声", "emotion": "sad"},
+    {"id": "morning_light", "name": "晨光", "emotion": "hopeful"},
+    {"id": "ocean_waves", "name": "海浪声", "emotion": "peaceful"},
+    {"id": "happy_ukulele", "name": "欢快尤克里里", "emotion": "happy"},
+    {"id": "cozy_evening", "name": "温馨夜晚", "emotion": "tired"},
+    {"id": "starry_night", "name": "星空冥想", "emotion": "lonely"},
+    {"id": "spring_breeze", "name": "春风拂面", "emotion": "excited"},
+]
+
+EMOTION_MUSIC_MAP = {
+    "calm": ["calm_piano", "ocean_waves"],
+    "happy": ["happy_ukulele", "spring_breeze"],
+    "sad": ["gentle_rain", "calm_piano"],
+    "lonely": ["starry_night", "ocean_waves"],
+    "tired": ["cozy_evening", "gentle_rain"],
+    "anxious": ["calm_piano", "ocean_waves"],
+    "hopeful": ["morning_light", "spring_breeze"],
+    "nostalgic": ["cozy_evening", "starry_night"],
+    "peaceful": ["ocean_waves", "calm_piano"],
+    "excited": ["happy_ukulele", "morning_light"],
+}
+
+
+@app.get("/api/music")
+def get_music_list(request: Request, emotion: str = ""):
+    all_music = [
+        {**m, "url": _music_url(m["id"])} for m in HEALING_MUSIC_DEF
+    ]
+
+    if emotion and emotion in EMOTION_MUSIC_MAP:
+        rec_ids = EMOTION_MUSIC_MAP[emotion]
+        rec = [m for m in all_music if m["id"] in rec_ids]
+        rest = [m for m in all_music if m["id"] not in rec_ids]
+        music = rec + rest
+    else:
+        music = list(all_music)
+
+    result = []
+    for m in music:
+        result.append({
+            **m,
+            "url": _abs_url(request, m["url"]),
+        })
+    return {"items": result, "total": len(result)}
+
+
+# ==================== AI Chat ====================
+@app.post("/api/chat")
+def ai_chat(
+    payload: schemas.ChatRequest,
+    current_user: models.User = Depends(get_current_user),
+):
+    from .ai_service import _get_client, LLM_MODEL
+
+    system_prompt = (
+        "你是 EchoMie 的治愈陪伴 AI。你温暖、共情、善于倾听。"
+        "用户可能正经历各种情绪，请温柔地回应，给予支持和鼓励。"
+        "回复简短温暖，像一个理解你的好朋友。不要给出专业医疗建议。"
+        "每次回复控制在 100 字以内。"
+    )
+
+    messages = [{"role": "system", "content": system_prompt}]
+
+    for msg in (payload.history or [])[-10:]:
+        messages.append({"role": msg.role, "content": msg.content})
+
+    messages.append({"role": "user", "content": payload.message})
+
+    try:
+        client = _get_client()
+        resp = client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=messages,
+            max_tokens=200,
+            temperature=0.8,
+        )
+        reply = resp.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error("Chat error: %s", e)
+        reply = "抱歉，我暂时无法回应，但我一直在这里陪着你 🌸"
+
+    return {"reply": reply}

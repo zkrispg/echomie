@@ -272,3 +272,17 @@ class HealthResponse(BaseModel):
 class UploadResponse(BaseModel):
     code: int = 0
     data: Dict[str, Any]
+
+
+# =====================
+# Chat
+# =====================
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class ChatRequest(BaseModel):
+    message: str
+    history: Optional[List[ChatMessage]] = None

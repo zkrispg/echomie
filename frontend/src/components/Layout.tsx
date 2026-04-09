@@ -30,6 +30,14 @@ export default function Layout() {
             <span className="nav-emoji">📊</span>
             每周总结
           </NavLink>
+          <NavLink to="/chat" className="nav-item">
+            <span className="nav-emoji">💬</span>
+            AI 陪伴
+          </NavLink>
+          <NavLink to="/music" className="nav-item">
+            <span className="nav-emoji">🎵</span>
+            音乐治愈
+          </NavLink>
           <NavLink to="/tasks" className="nav-item">
             <span className="nav-emoji">📋</span>
             我的任务

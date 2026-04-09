@@ -96,6 +96,13 @@ export const MOOD_OPTIONS: { mood: MoodType; emoji: string; label: string }[] = 
   { mood: "anxious", emoji: "😰", label: "焦虑" },
 ];
 
+export interface MusicItem {
+  id: string;
+  name: string;
+  emotion: string;
+  url: string;
+}
+
 export const EMOTION_MAP: Record<string, { label: string; emoji: string; color: string }> = {
   happy: { label: "开心", emoji: "😊", color: "#FFD93D" },
   calm: { label: "平静", emoji: "😌", color: "#A8D8EA" },

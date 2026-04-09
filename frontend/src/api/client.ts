@@ -1,7 +1,7 @@
 import type {
   TokenResponse, UserMe, TaskItem, TaskStatusResponse,
   TaskListResponse, MoodItem, MoodListResponse,
-  WeeklySummaryListResponse, StyleListResponse,
+  WeeklySummaryListResponse, StyleListResponse, MusicItem,
 } from "./types";
 
 const TOKEN_KEY = "echomie_token";
@@ -109,3 +109,15 @@ export const apiGetWeeklySummaries = (limit: number = 10) =>
 
 export const apiGenerateWeeklySummary = () =>
   request<{ ok: boolean; summary_id: number }>("/api/weekly-summary/generate", { method: "POST" });
+
+// Poster
+export const apiGeneratePoster = (taskId: number) =>
+  request<{ ok: boolean; poster_url: string }>(`/api/tasks/${taskId}/poster`);
+
+// Music
+export const apiGetMusic = (emotion: string = "") =>
+  request<{ items: MusicItem[]; total: number }>(`/api/music?emotion=${encodeURIComponent(emotion)}`);
+
+// Chat
+export const apiChat = (message: string, history: { role: string; content: string }[] = []) =>
+  request<{ reply: string }>("/api/chat", { method: "POST", body: JSON.stringify({ message, history }) });

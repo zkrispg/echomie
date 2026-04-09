@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { apiGetStatus, ApiError } from "../api/client";
+import { apiGetStatus, apiGeneratePoster, ApiError } from "../api/client";
 import { EMOTION_MAP } from "../api/types";
 import type { TaskStatusResponse } from "../api/types";
 
@@ -155,9 +155,29 @@ export default function EmotionCardPage() {
   const mainMedia = hasStyledOutput ? (showOriginal ? inputUrl! : outputUrl!) : (outputUrl || inputUrl);
   const isVideo = mainMedia ? isVideoUrl(mainMedia) : false;
 
+  const [posterUrl, setPosterUrl] = useState<string | null>(null);
+  const [posterLoading, setPosterLoading] = useState(false);
+
   const handleCopyText = () => {
     const text = [task.generated_title, task.generated_text].filter(Boolean).join("\n\n");
     if (text) navigator.clipboard.writeText(text).catch(() => {});
+  };
+
+  const handleSharePoster = async () => {
+    if (posterUrl) {
+      downloadFile(posterUrl, `echomie_poster_${taskIdNum}.jpg`);
+      return;
+    }
+    setPosterLoading(true);
+    try {
+      const res = await apiGeneratePoster(taskIdNum);
+      setPosterUrl(res.poster_url);
+      downloadFile(res.poster_url, `echomie_poster_${taskIdNum}.jpg`);
+    } catch (e) {
+      console.error("Poster generation failed", e);
+    } finally {
+      setPosterLoading(false);
+    }
   };
 
   return (
@@ -212,7 +232,23 @@ export default function EmotionCardPage() {
             <span>复制文案</span>
           </button>
         )}
+        <button
+          type="button"
+          className="card-action-btn share"
+          onClick={handleSharePoster}
+          disabled={posterLoading}
+        >
+          <span className="card-action-icon">{posterLoading ? "⏳" : "🎴"}</span>
+          <span>{posterLoading ? "生成中…" : "分享海报"}</span>
+        </button>
       </div>
+
+      {posterUrl && (
+        <div className="poster-preview">
+          <img src={posterUrl} alt="分享海报" className="poster-img" />
+          <p className="poster-hint">长按保存图片分享给好友</p>
+        </div>
+      )}
 
       <div
         className="card-emotion-badge"
