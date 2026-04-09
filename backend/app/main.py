@@ -304,6 +304,39 @@ def login_user(payload: schemas.UserLogin, db: Session = Depends(get_db)):
     return schemas.TokenResponse(access_token=create_access_token(str(user.id)))
 
 
+@app.post("/api/wx-login", response_model=schemas.TokenResponse)
+def wx_login(payload: schemas.WxLoginRequest, db: Session = Depends(get_db)):
+    """WeChat Mini Program login: exchange code for openid, auto register."""
+    import httpx
+    wx_appid = os.getenv("WX_APP_ID", "")
+    wx_secret = os.getenv("WX_APP_SECRET", "")
+    if not wx_appid or not wx_secret:
+        raise HTTPException(status_code=500, detail="微信登录未配置")
+    url = (
+        f"https://api.weixin.qq.com/sns/jscode2session"
+        f"?appid={wx_appid}&secret={wx_secret}"
+        f"&js_code={payload.code}&grant_type=authorization_code"
+    )
+    resp = httpx.get(url, timeout=10)
+    data = resp.json()
+    openid = data.get("openid")
+    if not openid:
+        logger.warning("wx login failed: %s", data)
+        raise HTTPException(status_code=401, detail=data.get("errmsg", "微信登录失败"))
+    user = db.query(models.User).filter(models.User.wx_openid == openid).first()
+    if not user:
+        user = models.User(
+            username=f"wx_{openid[:8]}",
+            email=f"{openid[:12]}@wx.echomie",
+            wx_openid=openid,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        logger.info("New WX user: id=%d, openid=%s", user.id, openid[:8])
+    return schemas.TokenResponse(access_token=create_access_token(str(user.id)))
+
+
 @app.put("/api/me/avatar")
 def update_avatar(
     payload: schemas.UpdateAvatarRequest,

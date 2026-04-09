@@ -19,8 +19,9 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(128), unique=True, index=True, nullable=False)
     email = Column(String(256), unique=True, index=True, nullable=False)
-    password_hash = Column(String(256), nullable=False)
+    password_hash = Column(String(256), nullable=False, default="")
     avatar_emoji = Column(String(16), nullable=False, default="🌸")
+    wx_openid = Column(String(128), unique=True, index=True, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     tasks = relationship("Task", back_populates="user")

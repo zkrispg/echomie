@@ -39,6 +39,10 @@ class UserLogin(BaseModel):
     password: str
 
 
+class WxLoginRequest(BaseModel):
+    code: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
