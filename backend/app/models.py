@@ -27,6 +27,7 @@ class User(Base):
     tasks = relationship("Task", back_populates="user")
     moods = relationship("MoodEntry", back_populates="user")
     weekly_summaries = relationship("WeeklySummary", back_populates="user")
+    chat_messages = relationship("ChatMessage", back_populates="user")
 
 
 class Task(Base):
@@ -95,3 +96,15 @@ class WeeklySummary(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="weekly_summaries")
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    role = Column(String(16), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="chat_messages")

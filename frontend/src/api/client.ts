@@ -119,5 +119,11 @@ export const apiGetMusic = (emotion: string = "") =>
   request<{ items: MusicItem[]; total: number }>(`/api/music?emotion=${encodeURIComponent(emotion)}`);
 
 // Chat
-export const apiChat = (message: string, history: { role: string; content: string }[] = []) =>
-  request<{ reply: string }>("/api/chat", { method: "POST", body: JSON.stringify({ message, history }) });
+export const apiChat = (message: string) =>
+  request<{ reply: string }>("/api/chat", { method: "POST", body: JSON.stringify({ message }) });
+
+export const apiGetChatHistory = () =>
+  request<{ items: { role: string; content: string; created_at: string }[] }>("/api/chat/history?limit=50");
+
+export const apiClearChatHistory = () =>
+  request<{ ok: boolean }>("/api/chat/history", { method: "DELETE" });

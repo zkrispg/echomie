@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { apiChat } from "../api/client";
+import { apiChat, apiGetChatHistory, apiClearChatHistory } from "../api/client";
 
 interface Message {
   role: "user" | "assistant";
@@ -14,7 +14,23 @@ export default function ChatPage() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    apiGetChatHistory()
+      .then((res) => {
+        if (res.items.length > 0) {
+          const history = res.items.map((m) => ({
+            role: m.role as "user" | "assistant",
+            content: m.content,
+          }));
+          setMessages([{ role: "assistant", content: GREETING }, ...history]);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setHistoryLoaded(true));
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -30,8 +46,7 @@ export default function ChatPage() {
     setLoading(true);
 
     try {
-      const history = messages.filter((m) => m.role !== "assistant" || m.content !== GREETING);
-      const res = await apiChat(text, history);
+      const res = await apiChat(text);
       setMessages((prev) => [...prev, { role: "assistant", content: res.reply }]);
     } catch {
       setMessages((prev) => [
@@ -41,6 +56,14 @@ export default function ChatPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleClear = async () => {
+    if (!confirm("确定清空所有聊天记录吗？")) return;
+    try {
+      await apiClearChatHistory();
+      setMessages([{ role: "assistant", content: GREETING }]);
+    } catch {}
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -55,6 +78,11 @@ export default function ChatPage() {
       <div className="chat-header">
         <span className="chat-header-icon">💬</span>
         <h2>AI 治愈陪伴</h2>
+        {historyLoaded && messages.length > 1 && (
+          <button className="chat-clear-btn" onClick={handleClear} title="清空记录">
+            🗑️
+          </button>
+        )}
       </div>
 
       <div className="chat-messages">

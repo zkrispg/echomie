@@ -904,10 +904,45 @@ def get_music_list(request: Request, emotion: str = ""):
 
 
 # ==================== AI Chat ====================
+@app.get("/api/chat/history")
+def get_chat_history(
+    limit: int = 50,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    msgs = (
+        db.query(models.ChatMessage)
+        .filter(models.ChatMessage.user_id == current_user.id)
+        .order_by(models.ChatMessage.id.desc())
+        .limit(min(limit, 200))
+        .all()
+    )
+    msgs.reverse()
+    return {
+        "items": [
+            {"role": m.role, "content": m.content, "created_at": str(m.created_at)}
+            for m in msgs
+        ]
+    }
+
+
+@app.delete("/api/chat/history")
+def clear_chat_history(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    db.query(models.ChatMessage).filter(
+        models.ChatMessage.user_id == current_user.id
+    ).delete()
+    db.commit()
+    return {"ok": True}
+
+
 @app.post("/api/chat")
 def ai_chat(
     payload: schemas.ChatRequest,
     current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     from .ai_service import _get_client, LLM_MODEL
 
@@ -918,11 +953,18 @@ def ai_chat(
         "每次回复控制在 100 字以内。"
     )
 
+    db_history = (
+        db.query(models.ChatMessage)
+        .filter(models.ChatMessage.user_id == current_user.id)
+        .order_by(models.ChatMessage.id.desc())
+        .limit(20)
+        .all()
+    )
+    db_history.reverse()
+
     messages = [{"role": "system", "content": system_prompt}]
-
-    for msg in (payload.history or [])[-10:]:
-        messages.append({"role": msg.role, "content": msg.content})
-
+    for m in db_history:
+        messages.append({"role": m.role, "content": m.content})
     messages.append({"role": "user", "content": payload.message})
 
     try:
@@ -937,5 +979,9 @@ def ai_chat(
     except Exception as e:
         logger.error("Chat error: %s", e)
         reply = "抱歉，我暂时无法回应，但我一直在这里陪着你 🌸"
+
+    db.add(models.ChatMessage(user_id=current_user.id, role="user", content=payload.message))
+    db.add(models.ChatMessage(user_id=current_user.id, role="assistant", content=reply))
+    db.commit()
 
     return {"reply": reply}
