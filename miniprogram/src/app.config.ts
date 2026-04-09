@@ -1,0 +1,31 @@
+export default defineAppConfig({
+  pages: [
+    "pages/index/index",
+    "pages/record/index",
+    "pages/timeline/index",
+    "pages/profile/index",
+    "pages/login/index",
+    "pages/card/index",
+    "pages/weekly/index",
+    "pages/chat/index",
+    "pages/music/index",
+  ],
+  tabBar: {
+    color: "#a89bb5",
+    selectedColor: "#9b7ecb",
+    backgroundColor: "#ffffff",
+    borderStyle: "white",
+    list: [
+      { pagePath: "pages/index/index", text: "首页", iconPath: "assets/tab-home.png", selectedIconPath: "assets/tab-home-active.png" },
+      { pagePath: "pages/record/index", text: "记录", iconPath: "assets/tab-record.png", selectedIconPath: "assets/tab-record-active.png" },
+      { pagePath: "pages/timeline/index", text: "时间轴", iconPath: "assets/tab-timeline.png", selectedIconPath: "assets/tab-timeline-active.png" },
+      { pagePath: "pages/profile/index", text: "我的", iconPath: "assets/tab-profile.png", selectedIconPath: "assets/tab-profile-active.png" },
+    ],
+  },
+  window: {
+    backgroundTextStyle: "light",
+    navigationBarBackgroundColor: "#9b7ecb",
+    navigationBarTitleText: "EchoMie",
+    navigationBarTextStyle: "white",
+  },
+});

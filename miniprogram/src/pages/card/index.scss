@@ -1,0 +1,89 @@
+.card-page {
+  padding-bottom: 60rpx;
+}
+.card-hero {
+  border-radius: 28rpx;
+  overflow: hidden;
+  box-shadow: 0 8rpx 40rpx rgba(155,126,203,0.1);
+  background: #f5f0eb;
+  margin-bottom: 24rpx;
+}
+.card-hero-media { width: 100%; display: block; }
+
+.compare-bar {
+  display: flex;
+  background: #fff;
+  border: 2rpx solid #ece4da;
+  border-radius: 28rpx;
+  overflow: hidden;
+  margin-bottom: 24rpx;
+}
+.compare-tab {
+  flex: 1;
+  padding: 20rpx;
+  text-align: center;
+  font-size: 26rpx;
+  font-weight: 700;
+  background: #faf5f0;
+  color: #6b5e7b;
+}
+.compare-tab:first-child { border-right: 2rpx solid #ece4da; }
+.compare-tab.active { background: #9b7ecb; color: #fff; }
+
+.card-actions {
+  display: flex; gap: 16rpx; margin-bottom: 32rpx; flex-wrap: wrap;
+}
+.action-btn {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24rpx 16rpx; border-radius: 28rpx;
+  border: 3rpx solid #ece4da; background: #fff;
+  font-size: 26rpx; font-weight: 600; text-align: center;
+}
+.action-btn.primary { background: #9b7ecb; border-color: #9b7ecb; color: #fff; }
+.action-btn.share { background: linear-gradient(135deg, #f3edfc, #e6f0ff); border-color: #9b7ecb; }
+.action-btn.disabled { opacity: 0.5; }
+
+.emotion-badge {
+  display: inline-flex; align-items: center; gap: 12rpx;
+  padding: 16rpx 32rpx; border-radius: 999rpx;
+  border: 4rpx solid #ece4da; background: #f3edfc;
+  margin-bottom: 24rpx;
+}
+.emotion-emoji { font-size: 40rpx; }
+.emotion-label { font-size: 28rpx; font-weight: 700; }
+
+.card-title {
+  font-size: 44rpx; font-weight: 800; line-height: 1.3;
+  display: block; margin-bottom: 24rpx;
+}
+
+.healing-card {
+  padding: 32rpx 36rpx; border-radius: 28rpx;
+  background: linear-gradient(135deg, #f3edfc 0%, #fff3ee 100%);
+  border: 2rpx solid #ece4da;
+  font-size: 30rpx; line-height: 1.7; color: #6b5e7b;
+  margin-bottom: 28rpx;
+}
+
+.tag-pills { display: flex; flex-wrap: wrap; gap: 12rpx; margin-bottom: 28rpx; }
+.tag-pill {
+  padding: 8rpx 24rpx; border-radius: 999rpx; font-size: 24rpx; font-weight: 600;
+  background: #fff; border: 2rpx solid #ece4da; color: #6b5e7b;
+}
+
+.voice-section { margin-bottom: 28rpx; }
+
+.scene-desc { font-size: 26rpx; color: #a89bb5; line-height: 1.5; display: block; margin-bottom: 24rpx; }
+
+.progress-label { display: block; font-size: 28rpx; font-weight: 600; color: #6b5e7b; margin-bottom: 16rpx; }
+.progress-bar { height: 12rpx; background: #f5f0eb; border-radius: 6rpx; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #9b7ecb, #f5a88e); border-radius: 6rpx; }
+.progress-pct { font-size: 24rpx; color: #a89bb5; display: block; margin-top: 8rpx; text-align: right; }
+
+.user-context {
+  margin-top: 32rpx; padding: 28rpx 32rpx; border-radius: 28rpx;
+  background: #faf5f0; border: 2rpx solid #ece4da;
+}
+.context-label { font-size: 22rpx; font-weight: 700; text-transform: uppercase; color: #a89bb5; display: block; margin-bottom: 12rpx; }
+.context-text { font-size: 28rpx; color: #6b5e7b; line-height: 1.5; }

@@ -1,0 +1,80 @@
+.home-page {
+  max-width: 100%;
+}
+.home-greeting {
+  margin-bottom: 40rpx;
+}
+.greeting-text {
+  font-size: 40rpx;
+  font-weight: 800;
+  display: block;
+}
+.home-affirmation {
+  margin-top: 24rpx;
+  padding: 28rpx 36rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(135deg, #f3edfc, #fff3ee);
+  border-left: 8rpx solid #9b7ecb;
+  font-size: 28rpx;
+  line-height: 1.6;
+}
+.section { margin-bottom: 40rpx; }
+.section-title { font-size: 32rpx; font-weight: 700; display: block; margin-bottom: 24rpx; }
+.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24rpx; }
+.section-link { font-size: 26rpx; font-weight: 600; color: #9b7ecb; }
+
+.mood-grid { display: flex; gap: 16rpx; flex-wrap: wrap; }
+.mood-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  padding: 24rpx 28rpx;
+  border-radius: 28rpx;
+  border: 4rpx solid #ece4da;
+  background: #faf5f0;
+}
+.mood-btn.active {
+  border-color: #9b7ecb;
+  background: #f3edfc;
+  box-shadow: 0 8rpx 24rpx rgba(155,126,203,0.15);
+}
+.mood-emoji { font-size: 52rpx; }
+.mood-label { font-size: 24rpx; font-weight: 600; color: #6b5e7b; }
+
+.empty-hint { text-align: center; padding: 48rpx; }
+
+.recent-grid { display: flex; flex-direction: column; gap: 20rpx; }
+.recent-card {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  background: #fff;
+  border-radius: 28rpx;
+  padding: 20rpx 24rpx;
+  box-shadow: 0 4rpx 16rpx rgba(155,126,203,0.06);
+}
+.recent-thumb { width: 100rpx; height: 100rpx; border-radius: 16rpx; flex-shrink: 0; }
+.recent-body { flex: 1; display: flex; align-items: center; gap: 16rpx; min-width: 0; }
+.recent-emoji { font-size: 40rpx; flex-shrink: 0; }
+.recent-title { font-size: 28rpx; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.quick-grid {
+  display: flex; gap: 20rpx;
+}
+.quick-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  padding: 36rpx 20rpx;
+  background: #fff;
+  border-radius: 28rpx;
+  border: 2rpx solid #ece4da;
+  box-shadow: 0 4rpx 16rpx rgba(155,126,203,0.06);
+  text-align: center;
+}
+.quick-icon { font-size: 56rpx; }
+.quick-label { font-size: 28rpx; font-weight: 700; color: #2d2640; }
+.quick-desc { font-size: 22rpx; color: #a89bb5; }

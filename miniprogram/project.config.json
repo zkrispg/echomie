@@ -1,0 +1,17 @@
+{
+  "miniprogramRoot": "dist/",
+  "projectname": "echomie",
+  "description": "EchoMie 情绪治愈小程序",
+  "appid": "wx23eb1cb2c26d7c65",
+  "setting": {
+    "urlCheck": false,
+    "es6": false,
+    "enhance": false,
+    "compileHotReLoad": false,
+    "postcss": false,
+    "minified": false,
+    "newFeature": true
+  },
+  "compileType": "miniprogram",
+  "condition": {}
+}

@@ -1,0 +1,44 @@
+{
+  "name": "echomie-miniprogram",
+  "version": "1.0.0",
+  "private": true,
+  "description": "EchoMie 情绪治愈小程序",
+  "templateInfo": {
+    "name": "default",
+    "typescript": true,
+    "css": "scss"
+  },
+  "scripts": {
+    "build:weapp": "taro build --type weapp",
+    "dev:weapp": "taro build --type weapp --watch"
+  },
+  "browserslist": [
+    "last 3 versions",
+    "Android >= 4.1",
+    "ios >= 8"
+  ],
+  "dependencies": {
+    "@tarojs/components": "3.6.35",
+    "@tarojs/helper": "3.6.35",
+    "@tarojs/plugin-framework-react": "^3.6.35",
+    "@tarojs/plugin-platform-weapp": "3.6.35",
+    "@tarojs/react": "3.6.35",
+    "@tarojs/runtime": "3.6.35",
+    "@tarojs/shared": "3.6.35",
+    "@tarojs/taro": "3.6.35",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.8.0",
+    "@babel/runtime": "^7.7.7",
+    "@tarojs/cli": "3.6.35",
+    "@tarojs/webpack5-runner": "3.6.35",
+    "@types/react": "^18.0.0",
+    "babel-preset-taro": "3.6.35",
+    "postcss": "^8.4.18",
+    "sass": "^1.80.0",
+    "typescript": "^5.1.0",
+    "webpack": "5.91.0"
+  }
+}
