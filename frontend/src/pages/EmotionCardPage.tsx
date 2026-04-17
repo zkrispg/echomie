@@ -44,9 +44,16 @@ export default function EmotionCardPage() {
   const [loadError, setLoadError] = useState("");
   const [badId, setBadId] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
+  const [posterUrl, setPosterUrl] = useState<string | null>(null);
+  const [posterLoading, setPosterLoading] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const taskIdNum = taskIdParam ? Number(taskIdParam) : NaN;
+
+  useEffect(() => {
+    setPosterUrl(null);
+    setPosterLoading(false);
+  }, [taskIdNum]);
 
   const handleDownload = useCallback((url: string, prefix: string) => {
     const ext = url.split(".").pop()?.split("?")[0] || "jpg";
@@ -154,9 +161,6 @@ export default function EmotionCardPage() {
   const tags = task.tags ?? [];
   const mainMedia = hasStyledOutput ? (showOriginal ? inputUrl! : outputUrl!) : (outputUrl || inputUrl);
   const isVideo = mainMedia ? isVideoUrl(mainMedia) : false;
-
-  const [posterUrl, setPosterUrl] = useState<string | null>(null);
-  const [posterLoading, setPosterLoading] = useState(false);
 
   const handleCopyText = () => {
     const text = [task.generated_title, task.generated_text].filter(Boolean).join("\n\n");
