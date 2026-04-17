@@ -2,19 +2,48 @@
 """Generate EchoMie-测试报告.docx from docs/EchoMie-测试报告.md (requires python-docx)."""
 import re
 from pathlib import Path
+from typing import Optional
 
 from docx import Document
 from docx.shared import Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 
+# Windows 常见中文字体；eastAsia 必须与西文 name 一致指向 CJK 字体，否则易出现方框
+FONT_BODY = "微软雅黑"
+FONT_TITLE = "黑体"
+FONT_TABLE = "微软雅黑"
 
-def set_cell_font(cell, size_pt=9):
+
+def _set_run_font(run, name: str, size_pt: Optional[float] = None, bold: Optional[bool] = None):
+    run.font.name = name
+    r = run._element
+    rpr = r.get_or_add_rPr()
+    rfonts = rpr.find(qn("w:rFonts"))
+    if rfonts is None:
+        from docx.oxml import OxmlElement
+
+        rfonts = OxmlElement("w:rFonts")
+        rpr.insert(0, rfonts)
+    rfonts.set(qn("w:ascii"), name)
+    rfonts.set(qn("w:hAnsi"), name)
+    rfonts.set(qn("w:eastAsia"), name)
+    rfonts.set(qn("w:cs"), name)
+    if size_pt is not None:
+        run.font.size = Pt(size_pt)
+    if bold is not None:
+        run.bold = bold
+
+
+def format_paragraph_runs(p, font_name: str, size_pt: Optional[float] = None, bold: Optional[bool] = None):
+    for run in p.runs:
+        _set_run_font(run, font_name, size_pt, bold)
+
+
+def set_cell_font(cell, size_pt: float = 9):
     for p in cell.paragraphs:
         for r in p.runs:
-            r.font.size = Pt(size_pt)
-            r.font.name = "宋体"
-            r._element.rPr.rFonts.set(qn("w:eastAsia"), "宋体")
+            _set_run_font(r, FONT_TABLE, size_pt)
 
 
 def add_table_from_rows(doc, rows):
@@ -55,6 +84,47 @@ def parse_md_table(lines, start_idx):
     return rows, i
 
 
+def _strip_inline_md(s: str) -> str:
+    s = s.replace("`", "")
+    s = re.sub(r"\*\*(.+?)\*\*", r"\1", s)
+    return s
+
+
+def _apply_doc_default_fonts(doc: Document):
+    """整篇文档默认用中文字体，避免正文/标题出现方框。"""
+    for name in ("Normal", "List Paragraph", "List Bullet", "List Number"):
+        try:
+            st = doc.styles[name]
+            st.font.name = FONT_BODY
+            st.font.size = Pt(10.5)
+            rpr = st._element.get_or_add_rPr()
+            from docx.oxml import OxmlElement
+
+            rfonts = rpr.find(qn("w:rFonts"))
+            if rfonts is None:
+                rfonts = OxmlElement("w:rFonts")
+                rpr.insert(0, rfonts)
+            for tag in ("w:ascii", "w:hAnsi", "w:eastAsia", "w:cs"):
+                rfonts.set(qn(tag), FONT_BODY)
+        except KeyError:
+            pass
+    for lvl in (1, 2, 3):
+        try:
+            st = doc.styles[f"Heading {lvl}"]
+            st.font.name = FONT_TITLE
+            rpr = st._element.get_or_add_rPr()
+            from docx.oxml import OxmlElement
+
+            rfonts = rpr.find(qn("w:rFonts"))
+            if rfonts is None:
+                rfonts = OxmlElement("w:rFonts")
+                rpr.insert(0, rfonts)
+            for tag in ("w:ascii", "w:hAnsi", "w:eastAsia", "w:cs"):
+                rfonts.set(qn(tag), FONT_TITLE)
+        except KeyError:
+            pass
+
+
 def main():
     root = Path(__file__).resolve().parent
     md_path = root / "docs" / "EchoMie-测试报告.md"
@@ -64,6 +134,8 @@ def main():
     lines = text.splitlines()
 
     doc = Document()
+    _apply_doc_default_fonts(doc)
+
     sect = doc.sections[0]
     sect.top_margin = Cm(2)
     sect.bottom_margin = Cm(2)
@@ -76,23 +148,21 @@ def main():
         stripped = line.strip()
 
         if stripped.startswith("# "):
-            p = doc.add_paragraph(stripped[2:].strip())
+            p = doc.add_paragraph(_strip_inline_md(stripped[2:].strip()))
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            for r in p.runs:
-                r.bold = True
-                r.font.size = Pt(18)
-                r.font.name = "黑体"
-                r._element.rPr.rFonts.set(qn("w:eastAsia"), "黑体")
+            format_paragraph_runs(p, FONT_TITLE, 18, True)
             i += 1
             continue
 
         if stripped.startswith("## "):
-            doc.add_heading(stripped[3:].strip(), level=1)
+            p = doc.add_heading(_strip_inline_md(stripped[3:].strip()), level=1)
+            format_paragraph_runs(p, FONT_TITLE, 14, True)
             i += 1
             continue
 
         if stripped.startswith("### "):
-            doc.add_heading(stripped[4:].strip(), level=2)
+            p = doc.add_heading(_strip_inline_md(stripped[4:].strip()), level=2)
+            format_paragraph_runs(p, FONT_TITLE, 12, True)
             i += 1
             continue
 
@@ -108,24 +178,27 @@ def main():
             continue
 
         if stripped.startswith("- "):
-            doc.add_paragraph(stripped[2:].strip(), style="List Bullet")
+            body = _strip_inline_md(stripped[2:].strip())
+            p = doc.add_paragraph(body, style="List Bullet")
+            format_paragraph_runs(p, FONT_BODY, 10.5)
             i += 1
             continue
         if re.match(r"^\d+\.\s", stripped):
-            body = re.sub(r"^\d+\.\s*", "", stripped).replace("**", "")
-            doc.add_paragraph(body, style="List Number")
+            body = _strip_inline_md(re.sub(r"^\d+\.\s*", "", stripped))
+            p = doc.add_paragraph(body, style="List Number")
+            format_paragraph_runs(p, FONT_BODY, 10.5)
             i += 1
             continue
 
         if stripped.startswith("**") and stripped.endswith("**"):
             p = doc.add_paragraph(stripped.strip("*"))
-            for r in p.runs:
-                r.bold = True
+            format_paragraph_runs(p, FONT_BODY, 10.5, True)
             i += 1
             continue
 
         if stripped:
-            doc.add_paragraph(stripped)
+            p = doc.add_paragraph(_strip_inline_md(stripped))
+            format_paragraph_runs(p, FONT_BODY, 10.5)
         i += 1
 
     doc.save(out_path)
