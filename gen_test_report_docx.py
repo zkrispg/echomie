@@ -125,23 +125,15 @@ def _apply_doc_default_fonts(doc: Document):
             pass
 
 
-def main():
-    root = Path(__file__).resolve().parent
-    md_path = root / "docs" / "EchoMie-测试报告.md"
-    out_path = root / "docs" / "EchoMie-测试报告.docx"
-
-    text = md_path.read_text(encoding="utf-8")
-    lines = text.splitlines()
-
-    doc = Document()
-    _apply_doc_default_fonts(doc)
-
+def set_default_margins(doc: Document):
     sect = doc.sections[0]
     sect.top_margin = Cm(2)
     sect.bottom_margin = Cm(2)
     sect.left_margin = Cm(2.5)
     sect.right_margin = Cm(2.5)
 
+
+def fill_document_from_markdown(doc: Document, lines: list):
     i = 0
     while i < len(lines):
         line = lines[i]
@@ -201,8 +193,24 @@ def main():
             format_paragraph_runs(p, FONT_BODY, 10.5)
         i += 1
 
+
+def build_document_from_md_file(md_path: Path, out_path: Path) -> None:
+    text = md_path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    doc = Document()
+    _apply_doc_default_fonts(doc)
+    set_default_margins(doc)
+    fill_document_from_markdown(doc, lines)
     doc.save(out_path)
     print("Saved:", out_path)
+
+
+def main():
+    root = Path(__file__).resolve().parent
+    build_document_from_md_file(
+        root / "docs" / "EchoMie-测试报告.md",
+        root / "docs" / "EchoMie-测试报告.docx",
+    )
 
 
 if __name__ == "__main__":
